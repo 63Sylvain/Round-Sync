@@ -68,7 +68,7 @@ jobs:
           ./scripts/checkProfanity.py translated_texts.txt
         shell: sh
       - name: Upload Raw Translations
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Translations
           path: |
