@@ -9,7 +9,7 @@ jobs:
     outputs:
       changed: ${{ steps.changeDetection.outputs.should-run }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v44
@@ -31,7 +31,7 @@ jobs:
     needs: dependency-change-verification
     if: needs.dependency-change-verification.outputs.changed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Read Go version from project
         run: echo "GO_VERSION=$(grep -E "^de\.felixnuesse\.extract\.goVersion=" gradle.properties | cut -d'=' -f2)"
       - name: Set up JDK 17

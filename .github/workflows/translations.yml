@@ -11,7 +11,7 @@ jobs:
       changed: ${{ steps.changeDetection.outputs.should-run }}
       files: ${{ steps.changeDetection.outputs.files }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v44
@@ -36,7 +36,7 @@ jobs:
     needs: string-change-verification
     if: needs.string-change-verification.outputs.changed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Prepare Profanity Check
