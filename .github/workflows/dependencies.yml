@@ -41,7 +41,7 @@ jobs:
           distribution: 'temurin'
           cache: gradle
       - name: Set up Go from gradle.properties
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version: '${{env.GO_VERSION}}'
         id: go
