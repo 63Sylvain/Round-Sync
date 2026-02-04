@@ -1,18 +1,20 @@
-name: Android Build Signed & OnAutoRelease
+name: Android CI Signed & Release
 
 on:
-  # Esecuzione manuale con selezione input
   workflow_dispatch:
     inputs:
-      build_variant:
-        description: 'Seleziona variante di build'
+      architecture:
+        description: 'Scegli architettura (Solo per build manuale)'
         required: true
-        default: 'oss'
+        default: 'all'
         type: choice
         options:
-          - oss
-          - debug
-  # Trigger automatico su nuove TAG (es. v1.2.3)
+          - all
+          - arm64-v8a
+          - armeabi-v7a
+          - x86
+          - x86_64
+          - universal
   push:
     tags:
       - 'v*'
@@ -21,7 +23,7 @@ jobs:
   build-signed:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Necessario per creare la Release e caricare gli asset
+      contents: write
     
     env:
       APP_KEYSTORE_BASE64: ${{ secrets.APP_KEYSTORE_BASE64 }}
@@ -33,10 +35,9 @@ jobs:
     - name: Checkout sources
       uses: actions/checkout@v6
       with:
-        fetch-depth: 0 # Utile per generare correttamente le release notes
+        fetch-depth: 0
 
-    # --- SETUP (Mantenere i tuoi step JDK, Go, NDK qui) ---
-    # [Inserisci qui i tuoi step di setup che hai omesso per brevità]
+    # ... (Qui vanno i tuoi step JDK, Go, NDK che hai nel file originale) ...
 
     - name: Decode Keystore
       if: ${{ env.APP_KEYSTORE_BASE64 }} 
@@ -50,30 +51,31 @@ jobs:
         CMD_RELEASE_KEY_ALIAS: ${{ env.KEY_ALIAS }}
         CMD_RELEASE_KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
       run: |
-        # Esegue la build ossRelease (default per i tag) o quella scelta manualmente
-        ./gradlew assembleOssRelease --stacktrace
+        # Logica di selezione:
+        # Se è un tag, costruisce tutto (assembleOssRelease)
+        # Se è manuale ed è scelta un'architettura specifica, usa il task mirato di Gradle
+        if [[ "${{ github.ref }}" == refs/tags/* ]] || [[ "${{ github.event.inputs.architecture }}" == "all" ]]; then
+          echo "Building all architectures..."
+          ./gradlew assembleOssRelease --stacktrace
+        else
+          ARCH="${{ github.event.inputs.architecture }}"
+          # Converte arm64-v8a in Arm64V8a per il comando Gradle (CamelCase)
+          GRADLE_ARCH=$(echo $ARCH | sed -r 's/(^|-)([a-z0-9])/\U\2/g')
+          echo "Building specific architecture: $ARCH"
+          ./gradlew "assembleOss${GRADLE_ARCH}Release" --stacktrace
+        fi
 
-    # --- UPLOAD ARTIFACTS (Per persistenza su GitHub Actions) ---
-
-    - name: Upload All APKs
+    - name: Upload APK Artifacts
       uses: actions/upload-artifact@v6
       with:
-        name: round-sync-all-apks
+        name: round-sync-${{ github.event.inputs.architecture || 'release' }}
         path: app/build/outputs/apk/oss/release/*.apk
-        if-no-files-found: warn
-
-    # --- PUBBLICAZIONE RELEASE (Solo su TAG) ---
 
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2 # Versione aggiornata per Node20
+      uses: softprops/action-gh-release@v2
       with:
-        files: |
-          app/build/outputs/apk/oss/release/*-oss-universal-release.apk
-          app/build/outputs/apk/oss/release/*-oss-arm64-v8a-release.apk
-          app/build/outputs/apk/oss/release/*-oss-armeabi-v7a-release.apk
-          app/build/outputs/apk/oss/release/*-oss-x86-release.apk
-          app/build/outputs/apk/oss/release/*-oss-x86_64-release.apk
+        files: app/build/outputs/apk/oss/release/*.apk
         generate_release_notes: true
         draft: false
         prerelease: false
