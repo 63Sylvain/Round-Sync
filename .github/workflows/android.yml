@@ -1,4 +1,4 @@
-name: Android CI Signed
+name: z_OLD_Android CI Signed
 
 on:
   workflow_dispatch: # Mantiene solo l'esecuzione manuale
