@@ -46,7 +46,7 @@ jobs:
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r27
+          ndk-version: r28c
           link-to-sdk: true
 
       - name: Decode Keystore
