@@ -5,17 +5,18 @@ apply plugin: 'kotlinx-serialization'
 android {
     signingConfigs {
         release {
+            // 1. GITHUB ACTIONS (CI)
             if (System.getenv("CMD_RELEASE_KEYSTORE") != null) {
                 storeFile file(System.getenv("CMD_RELEASE_KEYSTORE"))
                 storePassword System.getenv("CMD_RELEASE_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("CMD_RELEASE_KEY_ALIAS")
                 keyPassword System.getenv("CMD_RELEASE_KEY_PASSWORD")
             } else {
+                // 2. COMPILAZIONE LOCALE (PC)
                 def keystorePropertiesFile = rootProject.file("keystore.properties")
                 if (keystorePropertiesFile.exists()) {
                     def props = new Properties()
                     props.load(new FileInputStream(keystorePropertiesFile))
-
                     if (props['storeFile'] && file(props['storeFile']).exists()) {
                         storeFile file(props['storeFile'])
                         storePassword props['storePassword']
@@ -40,11 +41,7 @@ android {
         versionName '2.5.6'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField "java.lang.String", "CLI",
-                System.getenv('RCX_BUILD_CLI')
-                        ? System.getenv('RCX_BUILD_CLI')
-                        : "\"c03129b6-b09f-9cb4-8fcd-7f143b8f94ef\""
-
+        buildConfigField "java.lang.String", "CLI", System.getenv('RCX_BUILD_CLI') ? System.getenv('RCX_BUILD_CLI') : "\"c03129b6-b09f-9cb4-8fcd-7f143b8f94ef\""
         buildConfigField "java.lang.String", "VCP_AUTHORITY", "\"${applicationId}.vcp\""
 
         setProperty("archivesBaseName", "roundsync_v" + versionName)
@@ -56,55 +53,29 @@ android {
         }
     }
 
-    // ⭐ buildConfig + viewBinding
+    // ⭐️ FIX INSERITO QUI
     buildFeatures {
         buildConfig true
         viewBinding true
     }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17
-    }
-
-    packagingOptions {
-        jniLibs {
-            keepDebugSymbols += ['**/*.so']
-            useLegacyPackaging true   // ✔ ORA nel blocco corretto
-        }
-    }
-
-    androidResources {
-        generateLocaleConfig true
-    }
+    // ⭐️ FINE FIX
 
     buildTypes {
         debug {
             minifyEnabled false
             shrinkResources false
             manifestPlaceholders = [
-                    appIcon     : "@mipmap/ic_launcher_debug",
-                    appIconRound: "@mipmap/ic_launcher_debug_round"
+                    appIcon       : "@mipmap/ic_launcher_debug",
+                    appIconRound  : "@mipmap/ic_launcher_debug_round"
             ]
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-DEBUG"
-            buildConfigField "java.lang.String", "VCP_AUTHORITY", "\"${defaultConfig.applicationId}.debug.vcp\""
-
-            resValue("string", "app_name", "RS Debug")
-            resValue("string", "app_short_name", "RS Debug")
         }
-
         release {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             manifestPlaceholders = [
-                    appIcon     : "@mipmap/ic_launcher",
-                    appIconRound: "@mipmap/ic_launcher_round"
+                    appIcon      : "@mipmap/ic_launcher",
+                    appIconRound : "@mipmap/ic_launcher_round"
             ]
             signingConfig signingConfigs.release
         }
@@ -119,8 +90,12 @@ android {
     flavorDimensions += 'edition'
 
     productFlavors {
-        rs { dimension 'edition' }
-        oss { dimension 'edition' }
+        rs {
+            dimension 'edition'
+        }
+        oss {
+            dimension 'edition'
+        }
     }
 
     splits {
@@ -139,17 +114,36 @@ android {
             'x86_64'    : 9
     ]
 
-    applicationVariants.all { variant ->
+    android.applicationVariants.all { variant ->
         variant.outputs.each { output ->
             output.versionCodeOverride =
-                    project.ext.versionCodes.get(output.getFilter(com.android.build.OutputFile.ABI), 0)
-                            + android.defaultConfig.versionCode
+                    project.ext.versionCodes.get(output.getFilter(com.android.build.OutputFile.ABI), 0) +
+                            android.defaultConfig.versionCode
         }
     }
 
-    dependenciesInfo {
-        includeInApk = false
-        includeInBundle = false
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+                   useLegacyPackaging true
+        }
+    }
+
+    androidResources {
+        generateLocaleConfig true
+    }
+
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-DEBUG"
+            buildConfigField "java.lang.String", "VCP_AUTHORITY", "\"${defaultConfig.applicationId}.debug.vcp\""
+            resValue("string", "app_name", "RS Debug")
+            resValue("string", "app_short_name", "RS Debug")
+        }
     }
 
     lint {
@@ -163,6 +157,11 @@ android {
     }
 
     namespace 'ca.pkay.rcloneexplorer'
+
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
 }
 
 repositories {
@@ -171,5 +170,5 @@ repositories {
 }
 
 dependencies {
-    // il tuo blocco è invariato
+    // ... (tutto invariato)
 }
