@@ -1,0 +1,81 @@
+name: Android Build Signed & OnAutoRelease
+
+on:
+  # Esecuzione manuale con selezione input
+  workflow_dispatch:
+    inputs:
+      build_variant:
+        description: 'Seleziona variante di build'
+        required: true
+        default: 'oss'
+        type: choice
+        options:
+          - oss
+          - debug
+  # Trigger automatico su nuove TAG (es. v1.2.3)
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-signed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Necessario per creare la Release e caricare gli asset
+    
+    env:
+      APP_KEYSTORE_BASE64: ${{ secrets.APP_KEYSTORE_BASE64 }}
+      KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0 # Utile per generare correttamente le release notes
+
+    # --- SETUP (Mantenere i tuoi step JDK, Go, NDK qui) ---
+    # [Inserisci qui i tuoi step di setup che hai omesso per brevità]
+
+    - name: Decode Keystore
+      if: ${{ env.APP_KEYSTORE_BASE64 }} 
+      run: |
+        echo "$APP_KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+
+    - name: Build Signed Release APK
+      env:
+        CMD_RELEASE_KEYSTORE: release.keystore
+        CMD_RELEASE_KEYSTORE_PASSWORD: ${{ env.KEY_STORE_PASSWORD }}
+        CMD_RELEASE_KEY_ALIAS: ${{ env.KEY_ALIAS }}
+        CMD_RELEASE_KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
+      run: |
+        # Esegue la build ossRelease (default per i tag) o quella scelta manualmente
+        ./gradlew assembleOssRelease --stacktrace
+
+    # --- UPLOAD ARTIFACTS (Per persistenza su GitHub Actions) ---
+
+    - name: Upload All APKs
+      uses: actions/upload-artifact@v6
+      with:
+        name: round-sync-all-apks
+        path: app/build/outputs/apk/oss/release/*.apk
+        if-no-files-found: warn
+
+    # --- PUBBLICAZIONE RELEASE (Solo su TAG) ---
+
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2 # Versione aggiornata per Node20
+      with:
+        files: |
+          app/build/outputs/apk/oss/release/*-oss-universal-release.apk
+          app/build/outputs/apk/oss/release/*-oss-arm64-v8a-release.apk
+          app/build/outputs/apk/oss/release/*-oss-armeabi-v7a-release.apk
+          app/build/outputs/apk/oss/release/*-oss-x86-release.apk
+          app/build/outputs/apk/oss/release/*-oss-x86_64-release.apk
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
