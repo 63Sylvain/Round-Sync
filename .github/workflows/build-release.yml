@@ -36,7 +36,7 @@ jobs:
           cache-dependency-path: rclone/go.sum
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: 'platforms;android-35 build-tools;35.0.0 ndk;27.3.13750724'
 
