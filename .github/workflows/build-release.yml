@@ -82,7 +82,7 @@ jobs:
           CMD_RELEASE_KEY_PASSWORD: ReleaseKeyPass2024!
 
       - name: Upload APK artifacts (Latest)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: apk-release-latest
