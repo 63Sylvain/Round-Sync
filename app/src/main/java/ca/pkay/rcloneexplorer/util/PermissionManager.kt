@@ -109,12 +109,14 @@ class PermissionManager(private var mContext: Context) {
     fun requestAlarms() {
         val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
         intent.data = Uri.parse("package:" + mContext.packageName)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         mContext.startActivity(intent)
     }
 
     fun requestBatteryOptimizationException() {
         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
         intent.data = Uri.parse("package:" + mContext.packageName)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         mContext.startActivity(intent)
     }
 

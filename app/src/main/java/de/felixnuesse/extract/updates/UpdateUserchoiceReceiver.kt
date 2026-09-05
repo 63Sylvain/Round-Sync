@@ -41,24 +41,27 @@ class UpdateUserchoiceReceiver : BroadcastReceiver() {
             val version = preferenceManager.getString(versionKey,"")?: ""
 
             // the following might be superfluous. keep it for universal fallback.
-            var abi = when(Build.CPU_ABI) {
+            val primaryAbi = if (Build.SUPPORTED_ABIS.isNotEmpty()) Build.SUPPORTED_ABIS[0] else "universal"
+            val abi = when(primaryAbi) {
                 "x86" -> "x86"
                 "x86_64" -> "x86_64"
                 "arm64-v8a" -> "arm64-v8a"
                 "armeabi-v7a" -> "armeabi-v7a"
                 else -> {
-                    Log.e(tag(), "Unknown ABI, trying unviversal!")
-                    "unviversal"
+                    Log.e(tag(), "Unknown ABI, trying universal!")
+                    "universal"
                 }
             }
 
             if(version.isNotEmpty()) {
                 if (Build.VERSION.SDK_INT >= VERSION_CODES.N) {
+                    val pendingResult = goAsync()
                     downloadAndInstall(
                         URL("https://github.com/newhinton/Round-Sync/releases/download/$version/roundsync_$version-oss-$abi-release.apk"),
                         context,
                         version,
-                        abi
+                        abi,
+                        pendingResult
                     )
                 }
             }
@@ -67,29 +70,32 @@ class UpdateUserchoiceReceiver : BroadcastReceiver() {
     }
 
     @RequiresApi(VERSION_CODES.N)
-    private fun downloadAndInstall(url: URL, context: Context, version: String, abi: String) {
+    private fun downloadAndInstall(url: URL, context: Context, version: String, abi: String, pendingResult: PendingResult) {
         Log.e(tag(), "Download url: $url")
         Thread {
-            val dir = context.externalCacheDir?.absolutePath ?: ""
-            Log.e(tag(), "Download dir: $dir")
-            val target = File(dir, "roundsync_$version-oss-$abi-release.apk")
-            url.openStream()
-                .use { input ->
-                FileOutputStream(target).use {
-                    input.copyTo(it)
+            try {
+                val dir = context.externalCacheDir?.absolutePath ?: ""
+                Log.e(tag(), "Download dir: $dir")
+                val target = File(dir, "roundsync_$version-oss-$abi-release.apk")
+                url.openStream()
+                    .use { input ->
+                    FileOutputStream(target).use {
+                        input.copyTo(it)
+                    }
                 }
-            }
 
-            var fileUri = Uri.fromFile(target)
-            if (Build.VERSION.SDK_INT >= VERSION_CODES.N) {
-                fileUri = FileProvider.getUriForFile(context,BuildConfig.APPLICATION_ID + ".fileprovider", target)
-            }
+                val fileUri = FileProvider.getUriForFile(context, BuildConfig.APPLICATION_ID + ".fileprovider", target)
 
-            val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(fileUri, "application/vnd.android.package-archive")
-            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            context.startActivity(intent)
+                val intent = Intent(Intent.ACTION_VIEW)
+                intent.setDataAndType(fileUri, "application/vnd.android.package-archive")
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(tag(), "Failed to download update: ${e.message}", e)
+            } finally {
+                pendingResult.finish()
+            }
         }.start()
     }
 }

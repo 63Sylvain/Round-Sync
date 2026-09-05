@@ -23,22 +23,21 @@ jobs:
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '1.26.6'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 34
-          ndk-version: 27.3.13750724
+          packages: 'platforms;android-35 build-tools;35.0.0 ndk;27.3.13750724'
 
       - name: Create keystore
         run: |
@@ -67,12 +66,20 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          CMD_RELEASE_KEYSTORE: release.keystore
+          CMD_RELEASE_KEYSTORE_PASSWORD: ReleaseKeyPass2024!
+          CMD_RELEASE_KEY_ALIAS: release-key
+          CMD_RELEASE_KEY_PASSWORD: ReleaseKeyPass2024!
 
       - name: Build APK Release (Main Flavor)
         run: ./gradlew assembleRsRelease --build-cache --stacktrace || true
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          CMD_RELEASE_KEYSTORE: release.keystore
+          CMD_RELEASE_KEYSTORE_PASSWORD: ReleaseKeyPass2024!
+          CMD_RELEASE_KEY_ALIAS: release-key
+          CMD_RELEASE_KEY_PASSWORD: ReleaseKeyPass2024!
 
       - name: Upload APK artifacts (Latest)
         uses: actions/upload-artifact@v4
@@ -102,4 +109,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: rm -f release.keystore
+        run: rm -f release.keystore keystore.properties

@@ -108,7 +108,7 @@ abstract class WorkerNotification(var mContext: Context) {
         val i = Intent(mContext, SyncRestartAction::class.java)
         i.putExtra(EXTRA_TASK_ID, taskid)
 
-        val retryPendingIntent = PendingIntent.getService(mContext, taskid.toInt(), i,
+        val retryPendingIntent = PendingIntent.getBroadcast(mContext, taskid.toInt(), i,
                 GenericSyncNotification.getFlags()
         )
         val builder = NotificationCompat.Builder(mContext, CHANNEL_FAIL_ID)
@@ -137,7 +137,7 @@ abstract class WorkerNotification(var mContext: Context) {
         val i = Intent(mContext, SyncRestartAction::class.java)
         i.putExtra(EXTRA_TASK_ID, taskid)
 
-        val retryPendingIntent = PendingIntent.getService(mContext, taskid.toInt(), i,
+        val retryPendingIntent = PendingIntent.getBroadcast(mContext, taskid.toInt(), i,
                 GenericSyncNotification.getFlags()
         )
         val builder = NotificationCompat.Builder(mContext, CHANNEL_FAIL_ID)

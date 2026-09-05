@@ -16,8 +16,7 @@ public class TriggerReciever extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         FLog.e(TAG, "Recieved Intent");
 
-        assert intent != null;
-        if(intent.getAction().equals(TriggerService.TRIGGER_RECIEVE)){
+        if (intent != null && TriggerService.TRIGGER_RECIEVE.equals(intent.getAction())) {
             long i = intent.getLongExtra(TriggerService.TRIGGER_ID, -1);
             FLog.e(TAG, "Start Trigger: "+i);
             if(i==-1)

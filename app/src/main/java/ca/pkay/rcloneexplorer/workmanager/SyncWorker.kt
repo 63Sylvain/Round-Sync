@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
 import android.net.wifi.WifiManager
 import androidx.annotation.StringRes
+import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.PreferenceManager
 import androidx.work.ForegroundInfo
@@ -143,7 +144,10 @@ class SyncWorker (private var mContext: Context, workerParams: WorkerParameters)
 
     private fun finishWork() {
         sRcloneProcess?.destroy()
-        mContext.unregisterReceiver(connectivityChangeBroadcastReceiver)
+        try {
+            mContext.unregisterReceiver(connectivityChangeBroadcastReceiver)
+        } catch (ignored: IllegalArgumentException) {
+        }
         postSync()
     }
 
@@ -420,7 +424,12 @@ class SyncWorker (private var mContext: Context, workerParams: WorkerParameters)
     private fun registerBroadcastReceivers() {
         val intentFilter = IntentFilter()
         intentFilter.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION)
-        mContext.registerReceiver(connectivityChangeBroadcastReceiver, intentFilter)
+        ContextCompat.registerReceiver(
+            mContext,
+            connectivityChangeBroadcastReceiver,
+            intentFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     private val connectivityChangeBroadcastReceiver: BroadcastReceiver =

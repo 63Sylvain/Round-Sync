@@ -10,6 +10,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Parcel
 import androidx.annotation.StringRes
+import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.PreferenceManager
 import androidx.work.ForegroundInfo
@@ -191,7 +192,10 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
 
     private fun finishWork() {
         sRcloneProcess?.destroy()
-        mContext.unregisterReceiver(connectivityChangeBroadcastReceiver)
+        try {
+            mContext.unregisterReceiver(connectivityChangeBroadcastReceiver)
+        } catch (ignored: IllegalArgumentException) {
+        }
         postSync()
     }
 
@@ -402,7 +406,12 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
     private fun registerBroadcastReceivers() {
         val intentFilter = IntentFilter()
         intentFilter.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION)
-        mContext.registerReceiver(connectivityChangeBroadcastReceiver, intentFilter)
+        ContextCompat.registerReceiver(
+            mContext,
+            connectivityChangeBroadcastReceiver,
+            intentFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     private val connectivityChangeBroadcastReceiver: BroadcastReceiver =

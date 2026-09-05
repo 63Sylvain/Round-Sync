@@ -123,7 +123,7 @@ class SyncServiceNotifications(var mContext: Context) {
         val i = Intent(mContext, SyncRestartAction::class.java)
         i.putExtra(EXTRA_TASK_ID, taskid)
 
-        val retryPendingIntent = PendingIntent.getService(mContext, taskid.toInt(), i, GenericSyncNotification.getFlags())
+        val retryPendingIntent = PendingIntent.getBroadcast(mContext, taskid.toInt(), i, GenericSyncNotification.getFlags())
         val builder = NotificationCompat.Builder(mContext, CHANNEL_FAIL_ID)
             .setSmallIcon(R.drawable.ic_twotone_cloud_error_24)
             .setContentTitle(mContext.getString(R.string.operation_failed_cancelled))

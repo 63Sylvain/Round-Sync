@@ -22,8 +22,10 @@ signingConfigs {
                     props.load(new FileInputStream(keystorePropertiesFile))
                     
                     // Verifica che il file della chiave indicato nelle proprietà esista
-                    if (props['storeFile'] && file(props['storeFile']).exists()) {
-                        storeFile file(props['storeFile'])
+                    def storePath = props['storeFile']
+                    def kFile = storePath ? (file(storePath).exists() ? file(storePath) : rootProject.file(storePath)) : null
+                    if (kFile && kFile.exists()) {
+                        storeFile kFile
                         storePassword props['storePassword']
                         keyAlias props['keyAlias']
                         keyPassword props['keyPassword']
@@ -38,7 +40,7 @@ signingConfigs {
         vectorDrawables.generatedDensities = []
         applicationId 'de.felixnuesse.extract'
         minSdkVersion 23
-        compileSdk 34
+        compileSdk 35
         targetSdkVersion 35
         versionCode 410 // last digit is reserved for ABI, only ever end on 0!
         versionName '2.5.6'
@@ -56,6 +58,7 @@ signingConfigs {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     buildTypes {
@@ -199,11 +202,10 @@ dependencies {
     // Thumbnails
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
-    implementation 'androidx.preference:preference:1.2.1'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
     // REST Client
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    debugImplementation 'com.squareup.okhttp3:logging-interceptor:4.9.1'
+    debugImplementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     // JSON
     implementation 'com.fasterxml.jackson.core:jackson-core:2.14.1'
     implementation 'com.fasterxml.jackson.core:jackson-annotations:2.14.1'

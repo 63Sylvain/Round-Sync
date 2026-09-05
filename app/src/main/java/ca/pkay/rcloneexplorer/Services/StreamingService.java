@@ -8,9 +8,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.content.pm.ServiceInfo;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import ca.pkay.rcloneexplorer.Activities.MainActivity;
 import ca.pkay.rcloneexplorer.BroadcastReceivers.ServeCancelAction;
 import ca.pkay.rcloneexplorer.Items.RemoteItem;
 import ca.pkay.rcloneexplorer.R;
@@ -72,7 +74,7 @@ public class StreamingService extends IntentService {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags = PendingIntent.FLAG_IMMUTABLE;
         }
-        Intent foregroundIntent = new Intent(this, StreamingService.class);
+        Intent foregroundIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, foregroundIntent, flags);
 
         Intent cancelIntent = new Intent(this, ServeCancelAction.class);
@@ -94,7 +96,11 @@ public class StreamingService extends IntentService {
             builder.setContentText(getString(R.string.streaming_service_notification_content, port));
         }
 
-        startForeground(PERSISTENT_NOTIFICATION_ID, builder.build());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(PERSISTENT_NOTIFICATION_ID, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+        } else {
+            startForeground(PERSISTENT_NOTIFICATION_ID, builder.build());
+        }
 
         switch (protocol) {
             case SERVE_FTP:
