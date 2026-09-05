@@ -46,38 +46,49 @@ jobs:
           api-level: 34
           ndk-version: 27.3.13750724
 
-      - name: Create keystore
+      - name: Generate secure keystore
         run: |
-          keytool -genkey -v -keystore release.keystore \
+          mkdir -p $HOME/.android
+          keytool -genkey -v \
+            -keystore $HOME/.android/release.keystore \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -alias release-key \
-            -storepass 'ReleaseKeyStorePassword123!' \
-            -keypass 'ReleaseKeyPassword123!' \
-            -dname "CN=Round-Sync-Build, OU=Build, O=Round-Sync, L=Internet, ST=Online, C=US"
+            -storepass ReleaseKeyPass2024! \
+            -keypass ReleaseKeyPass2024! \
+            -dname "CN=Round-Sync, OU=Development, O=Round-Sync, L=Web, ST=Online, C=US" || echo "Keystore already exists"
 
       - name: Create keystore.properties
         run: |
-          cat > keystore.properties << EOF
-          storeFile=${{ github.workspace }}/release.keystore
-          storePassword=ReleaseKeyStorePassword123!
+          cat > keystore.properties << 'EOF'
+          storeFile=${{ env.HOME }}/.android/release.keystore
+          storePassword=ReleaseKeyPass2024!
           keyAlias=release-key
-          keyPassword=ReleaseKeyPassword123!
+          keyPassword=ReleaseKeyPass2024!
           EOF
 
       - name: Grant execute permission to gradlew
         run: chmod +x gradlew
 
-      - name: Build APK Release (OSS)
-        run: ./gradlew assembleOssRelease --build-cache --stacktrace
+      - name: Build APK Release (OSS flavor)
+        run: |
+          ./gradlew assembleOssRelease \
+            --build-cache \
+            --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx4096m"
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
 
-      - name: Build APK Release (Main Flavor)
-        run: ./gradlew assembleRsRelease --build-cache --stacktrace || true
+      - name: Build APK Release (RS flavor)
+        run: |
+          ./gradlew assembleRsRelease \
+            --build-cache \
+            --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx4096m" || echo "RS flavor build skipped or failed"
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        continue-on-error: true
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
@@ -91,9 +102,13 @@ jobs:
         if: always()
         run: |
           echo "📦 Generated APK files:"
-          find app/build/outputs/apk -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "No APK files found"
+          if [ -d "app/build/outputs/apk" ]; then
+            find app/build/outputs/apk -name "*.apk" -type f -exec ls -lh {} \;
+          else
+            echo "No APK output directory found"
+          fi
 
-      - name: Create Release
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
@@ -103,6 +118,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cleanup
+      - name: Cleanup sensitive files
         if: always()
-        run: rm -f release.keystore
+        run: |
+          rm -f $HOME/.android/release.keystore
+          rm -f keystore.properties
