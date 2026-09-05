@@ -42,25 +42,21 @@ jobs:
 
       - name: Create keystore
         run: |
-          keytool -genkey -v -keystore release.keystore \
+          keytool -genkey -v \
+            -keystore release.keystore \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -alias release-key \
-            -storepass 'ReleaseKeyStorePassword123!' \
-            -keypass 'ReleaseKeyPassword123!' \
-            -dname "CN=Round-Sync-Build, OU=Build, O=Round-Sync, L=Internet, ST=Online, C=US"
-          
-          echo "keystore_path=$GITHUB_WORKSPACE/release.keystore" >> $GITHUB_ENV
-          echo "keystore_password=ReleaseKeyStorePassword123!" >> $GITHUB_ENV
-          echo "key_alias=release-key" >> $GITHUB_ENV
-          echo "key_password=ReleaseKeyPassword123!" >> $GITHUB_ENV
+            -storepass ReleaseKeyPass2024! \
+            -keypass ReleaseKeyPass2024! \
+            -dname "CN=Round-Sync, OU=Development, O=Round-Sync, L=Web, ST=Online, C=US"
 
       - name: Create keystore.properties
         run: |
-          cat > keystore.properties << EOF
-          storeFile=${{ github.workspace }}/release.keystore
-          storePassword=${{ env.keystore_password }}
-          keyAlias=${{ env.key_alias }}
-          keyPassword=${{ env.key_password }}
+          cat > keystore.properties << 'EOF'
+          storeFile=release.keystore
+          storePassword=ReleaseKeyPass2024!
+          keyAlias=release-key
+          keyPassword=ReleaseKeyPass2024!
           EOF
 
       - name: Grant execute permission to gradlew

@@ -1,6 +1,6 @@
 # GitHub Actions Workflows
 
-## Build APK Release (`build-apk-release.yml`)
+## Build APK Release (`build-release.yml`)
 
 **Triggers:**
 - Every push to `main`, `master`, or `develop` branches
