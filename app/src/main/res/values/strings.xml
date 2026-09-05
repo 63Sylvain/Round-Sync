@@ -180,6 +180,14 @@
     <string name="remote_name_hint">Name (a–z, 0-9 only)</string>
     <string name="waiting_for_code">Waiting for code</string>
     <string name="open_browser">Open browser</string>
+    <string name="gdrive_quick_connect_title">Quick Google Drive Connection</string>
+    <string name="gdrive_quick_connect_desc">Connect directly with your Google account in one click. No technical credentials or manual setup required.</string>
+    <string name="gdrive_signin_button">Sign in with Google</string>
+    <string name="advanced_options_title">Advanced Options (Optional)</string>
+    <string name="advanced_options_toggle_show">Show advanced options (Custom Client ID, Service Account…)</string>
+    <string name="advanced_options_toggle_hide">Hide advanced options</string>
+    <string name="oauth_waiting_in_browser">A browser window has opened. Please sign in to your account and approve the access request.</string>
+    <string name="oauth_reopen_browser">Reopen browser</string>
     <string name="provider_ftp">FTP</string>
     <string name="provider_http">HTTP</string>
     <string name="serve_dlna">DLNA</string>

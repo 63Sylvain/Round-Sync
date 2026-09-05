@@ -11,6 +11,7 @@ import android.text.TextWatcher
 import android.util.Log
 import android.util.TypedValue
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -23,6 +24,7 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.CompoundButton
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -37,6 +39,7 @@ import ca.pkay.rcloneexplorer.Rclone
 import ca.pkay.rcloneexplorer.Rclone.RCLONE_CONFIG_NAME_KEY
 import ca.pkay.rcloneexplorer.rclone.Provider
 import ca.pkay.rcloneexplorer.rclone.ProviderOption
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -103,6 +106,30 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
 
     }
 
+    private fun generateDefaultRemoteName(providerName: String): String {
+        val baseName = when(providerName.lowercase(Locale.ROOT)) {
+            "drive" -> "Google Drive"
+            "onedrive" -> "OneDrive"
+            "dropbox" -> "Dropbox"
+            "box" -> "Box"
+            "pcloud" -> "pCloud"
+            else -> mProvider?.getNameCapitalized() ?: "Remote"
+        }
+        val existingRemotes = try {
+            rclone?.remotes?.map { it.name } ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        if (!existingRemotes.contains(baseName)) {
+            return baseName
+        }
+        var i = 2
+        while (existingRemotes.contains("$baseName $i")) {
+            i++
+        }
+        return "$baseName $i"
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -117,6 +144,30 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
         mCancelAuthButton = view.findViewById(R.id.cancel_auth)
 
         mFinishButton = view.findViewById(R.id.finish)
+
+        val serviceIcon = mAuthView?.findViewById<ImageView>(R.id.auth_service_icon)
+        when (mProviderTitle.lowercase(Locale.ROOT)) {
+            "drive" -> {
+                serviceIcon?.visibility = View.VISIBLE
+                serviceIcon?.setImageResource(R.drawable.ic_google_drive)
+            }
+            "onedrive" -> {
+                serviceIcon?.visibility = View.VISIBLE
+                serviceIcon?.setImageResource(R.drawable.ic_onedrive)
+            }
+            "dropbox" -> {
+                serviceIcon?.visibility = View.VISIBLE
+                serviceIcon?.setImageResource(R.drawable.ic_dropbox)
+            }
+            "box" -> {
+                serviceIcon?.visibility = View.VISIBLE
+                serviceIcon?.setImageResource(R.drawable.ic_box)
+            }
+        }
+
+        if (!mIsEditTask && (mRemoteName?.text.isNullOrBlank())) {
+            mRemoteName?.setText(generateDefaultRemoteName(mProviderTitle))
+        }
 
         if(mUseOauth) {
             (mFinishButton as FloatingActionButton).contentDescription = getString(R.string.next)
@@ -189,9 +240,115 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
             mRemoteName?.setText(mOptionMap.getValue(RCLONE_CONFIG_NAME_KEY))
             mRemoteName?.isFocusable = false
             mRemoteName?.isEnabled = false
+        } else if (!mIsEditTask && (mRemoteName?.text.isNullOrBlank())) {
+            mRemoteName?.setText(generateDefaultRemoteName(mProviderTitle))
+        }
+
+        val isGoogleDrive = mProviderTitle.equals("drive", ignoreCase = true)
+
+        // 1. Quick Connect Card for Google Drive
+        if (isGoogleDrive && !mIsEditTask) {
+            val quickConnectCard = getCard()
+            val qcLayout = LinearLayout(mContext).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+
+            // Header row with Google Drive icon + Title
+            val headerRow = LinearLayout(mContext).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val iconView = ImageView(mContext).apply {
+                setImageResource(R.drawable.ic_google_drive)
+                val iconSize = getDPasPixel(36).toInt()
+                layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                    marginEnd = getDPasPixel(12).toInt()
+                }
+            }
+            val titleView = TextView(mContext).apply {
+                text = getString(R.string.gdrive_quick_connect_title)
+                textSize = 17f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(convertAttributeToColor(R.attr.colorOnSecondaryContainer))
+            }
+            headerRow.addView(iconView)
+            headerRow.addView(titleView)
+            qcLayout.addView(headerRow)
+
+            // Description
+            val descView = TextView(mContext).apply {
+                text = getString(R.string.gdrive_quick_connect_desc)
+                textSize = 14f
+                setPadding(0, getDPasPixel(8).toInt(), 0, getDPasPixel(16).toInt())
+                setTextColor(convertAttributeToColor(R.attr.colorOnSecondaryContainer))
+            }
+            qcLayout.addView(descView)
+
+            // One-click "Sign in with Google" button
+            val googleButton = MaterialButton(ContextThemeWrapper(mContext, com.google.android.material.R.style.Widget_MaterialComponents_Button)).apply {
+                text = getString(R.string.gdrive_signin_button)
+                setIconResource(R.drawable.ic_google)
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                iconPadding = getDPasPixel(8).toInt()
+                textSize = 15f
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setOnClickListener {
+                    connectQuickOauth()
+                }
+            }
+            qcLayout.addView(googleButton)
+
+            quickConnectCard.addView(qcLayout)
+            mFormView?.addView(quickConnectCard)
+        }
+
+        // 2. Expandable toggle card for Advanced / Manual Options (if OAuth)
+        if (mUseOauth) {
+            val toggleAdvancedCard = getCard().apply {
+                isClickable = true
+                isFocusable = true
+            }
+            val toggleLayout = LinearLayout(mContext).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val toggleText = TextView(mContext).apply {
+                text = if (mShowAdvanced) getString(R.string.advanced_options_toggle_hide) else getString(R.string.advanced_options_toggle_show)
+                textSize = 14f
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                setTextColor(convertAttributeToColor(R.attr.colorPrimary))
+            }
+            val toggleIcon = ImageView(mContext).apply {
+                setImageResource(if (mShowAdvanced) R.drawable.ic_expand_less else R.drawable.ic_expand_more)
+                layoutParams = LinearLayout.LayoutParams(getDPasPixel(24).toInt(), getDPasPixel(24).toInt())
+            }
+            toggleLayout.addView(toggleText)
+            toggleLayout.addView(toggleIcon)
+            toggleAdvancedCard.addView(toggleLayout)
+            toggleAdvancedCard.setOnClickListener {
+                mShowAdvanced = !mShowAdvanced
+                setUpForm()
+            }
+            mFormView?.addView(toggleAdvancedCard)
         }
 
         mProvider!!.options.forEach {
+
+            // For Google Drive, hide technical options unless mShowAdvanced is true
+            if (isGoogleDrive && !mShowAdvanced) {
+                return@forEach
+            }
+
+            // For other OAuth providers, hide client_id & client_secret unless mShowAdvanced is true
+            if (mUseOauth && !mShowAdvanced) {
+                if (it.name == "client_id" || it.name == "client_secret") {
+                    return@forEach
+                }
+            }
 
             if(it.advanced && !mShowAdvanced ) {
                 return@forEach
@@ -506,10 +663,24 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
         return typedValue.data
     }
 
+    private fun connectQuickOauth() {
+        if (mRemoteName?.text.isNullOrBlank()) {
+            mRemoteName?.setText(generateDefaultRemoteName(mProviderTitle))
+        }
+        if (mProviderTitle.equals("drive", ignoreCase = true) && !mOptionMap.containsKey("scope")) {
+            mOptionMap["scope"] = "drive"
+        }
+        setUpRemote()
+    }
+
     private fun setUpRemote() {
 
         val options = java.util.ArrayList<String>()
-        val name: String = mRemoteName?.text.toString()
+        var name: String = mRemoteName?.text.toString().trim()
+        if (name.isEmpty()) {
+            name = generateDefaultRemoteName(mProviderTitle)
+            mRemoteName?.setText(name)
+        }
         options.add(name)
         options.add(mProviderTitle)
 
@@ -521,9 +692,10 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
             }
         }
         for ((key, value) in mOptionMap) {
-            //Log.e("TAG", "key: $key value: $value (${value.length})")
-            options.add(key)
-            options.add(value)
+            if (value.isNotBlank()) {
+                options.add(key)
+                options.add(value)
+            }
         }
 
         if(mIsEditTask) {

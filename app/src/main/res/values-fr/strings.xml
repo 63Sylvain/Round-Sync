@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gdrive_quick_connect_title">Connexion rapide Google Drive</string>
+    <string name="gdrive_quick_connect_desc">Connectez-vous directement avec votre compte Google en un clic. Aucun paramètre technique ou identifiant complexe n\'est requis.</string>
+    <string name="gdrive_signin_button">Se connecter avec Google</string>
+    <string name="advanced_options_title">Options avancées (Optionnel)</string>
+    <string name="advanced_options_toggle_show">Afficher les options avancées (Client ID, Compte de service…)</string>
+    <string name="advanced_options_toggle_hide">Masquer les options avancées</string>
+    <string name="oauth_waiting_in_browser">Une fenêtre de navigateur s\'est ouverte. Connectez-vous avec votre compte et autorisez l\'accès.</string>
+    <string name="oauth_reopen_browser">Rouvrir le navigateur</string>
+</resources>

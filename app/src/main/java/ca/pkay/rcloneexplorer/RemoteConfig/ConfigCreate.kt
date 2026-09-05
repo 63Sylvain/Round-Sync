@@ -12,6 +12,9 @@ import android.view.View
 import ca.pkay.rcloneexplorer.Activities.MainActivity
 import java.util.ArrayList
 
+import android.widget.Button
+import android.widget.TextView
+
 @SuppressLint("StaticFieldLeak")
 class ConfigCreate internal constructor(
     options: ArrayList<String>?,
@@ -26,6 +29,7 @@ class ConfigCreate internal constructor(
     private val mRclone: Rclone
     private val mFormView: View
     private val mAuthView: View
+    private var mAuthUrl: String? = null
 
     init {
         this.options = ArrayList(options)
@@ -42,7 +46,20 @@ class ConfigCreate internal constructor(
     }
 
     override fun doInBackground(vararg params: Void?): Boolean {
-        return OauthHelper.createOptionsWithOauth(options, mRclone, mContext)
+        val callback = OauthHelper.AuthUrlCallback { url ->
+            mAuthUrl = url
+            mAuthView.post {
+                val progressText = mAuthView.findViewById<TextView>(R.id.progressText)
+                progressText?.text = mContext.getString(R.string.oauth_waiting_in_browser)
+                val launchBrowserButton = mAuthView.findViewById<Button>(R.id.launch_browser)
+                launchBrowserButton?.visibility = View.VISIBLE
+                launchBrowserButton?.text = mContext.getString(R.string.oauth_reopen_browser)
+                launchBrowserButton?.setOnClickListener {
+                    OauthHelper.launchBrowser(mContext, url)
+                }
+            }
+        }
+        return OauthHelper.createOptionsWithOauth(options, mRclone, mContext, callback)
     }
 
     override fun onCancelled() {

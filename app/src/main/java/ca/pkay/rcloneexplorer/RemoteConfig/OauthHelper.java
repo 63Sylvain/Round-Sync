@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import android.content.Intent;
+
 /**
  * Provides utility methods for authorization of OAuth remotes
  */
@@ -24,6 +26,10 @@ public class OauthHelper {
     private static final String TAG = "OAuthHelper";
     private static final String regex = "go to the following link: ([^\\s]+)";
     private static final OauthProcessToken oauthProcessToken = new OauthProcessToken();
+
+    public interface AuthUrlCallback {
+        void onAuthUrlReceived(String url);
+    }
 
     // Since OAuth always blocks port 53682, only a single authentication
     // attempt is allowed at a time.
@@ -83,6 +89,10 @@ public class OauthHelper {
      * @return true if successful
      **/
     public static boolean createOptionsWithOauth(ArrayList<String> options, Rclone rclone, Context context) {
+        return createOptionsWithOauth(options, rclone, context, null);
+    }
+
+    public static boolean createOptionsWithOauth(ArrayList<String> options, Rclone rclone, Context context, AuthUrlCallback callback) {
         // Since authorization uses a fixed port, shut down previous attempt.
         oauthProcessToken.forceRelease();
 
@@ -90,7 +100,7 @@ public class OauthHelper {
         if (null == process) {
             return false;
         }
-        UrlAuthThread currentAuth = new OauthHelper.UrlAuthThread(process, context);
+        UrlAuthThread currentAuth = new OauthHelper.UrlAuthThread(process, context, callback);
         oauthProcessToken.acquire(currentAuth);
         currentAuth.start();
         try {
@@ -112,11 +122,17 @@ public class OauthHelper {
         private static final String TAG = "UrlAuthThread";
         private final Process process;
         private final Context context;
+        private final AuthUrlCallback callback;
         private volatile boolean stopped = false;
 
         public UrlAuthThread(Process process, Context context) {
+            this(process, context, null);
+        }
+
+        public UrlAuthThread(Process process, Context context, AuthUrlCallback callback) {
             this.process = process;
             this.context = context;
+            this.callback = callback;
         }
 
         public void run() {
@@ -127,6 +143,9 @@ public class OauthHelper {
                     if (matcher.find()) {
                         String url = matcher.group(1);
                         if (url != null) {
+                            if (callback != null) {
+                                callback.onAuthUrlReceived(url);
+                            }
                             launchBrowser(context, url);
                         }
 
@@ -157,16 +176,21 @@ public class OauthHelper {
         }
     }
 
-    static void launchBrowser(@NonNull Context context, @NonNull String url) {
-        CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
-        CustomTabsIntent customTabsIntent = builder.build();
+    public static void launchBrowser(@NonNull Context context, @NonNull String url) {
         try {
+            CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
+            CustomTabsIntent customTabsIntent = builder.build();
+            customTabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             customTabsIntent.launchUrl(context, Uri.parse(url));
-        } catch (SecurityException e) {
-            // This happens if a buggy third party component is registered for
-            // browser intents with a non-exported activity.
-            // TODO: Fix this for Android TV
-            FLog.e(TAG, "Could not launch browser", e);
+        } catch (Exception e) {
+            FLog.e(TAG, "Could not launch Custom Tabs, falling back to ACTION_VIEW", e);
+            try {
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(browserIntent);
+            } catch (Exception ex) {
+                FLog.e(TAG, "Could not launch standard browser", ex);
+            }
         }
     }
 
