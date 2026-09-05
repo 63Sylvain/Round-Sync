@@ -33,6 +33,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.26.6'
+          cache-dependency-path: rclone/go.sum
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -48,6 +49,7 @@ jobs:
             -storepass ReleaseKeyPass2024! \
             -keypass ReleaseKeyPass2024! \
             -dname "CN=Round-Sync, OU=Development, O=Round-Sync, L=Web, ST=Online, C=US"
+          cp release.keystore app/release.keystore
 
       - name: Create keystore.properties
         run: |
@@ -57,6 +59,7 @@ jobs:
           keyAlias=release-key
           keyPassword=ReleaseKeyPass2024!
           EOF
+          cp keystore.properties app/keystore.properties
 
       - name: Grant execute permission to gradlew
         run: chmod +x gradlew
@@ -66,17 +69,17 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
-          CMD_RELEASE_KEYSTORE: release.keystore
+          CMD_RELEASE_KEYSTORE: ${{ github.workspace }}/release.keystore
           CMD_RELEASE_KEYSTORE_PASSWORD: ReleaseKeyPass2024!
           CMD_RELEASE_KEY_ALIAS: release-key
           CMD_RELEASE_KEY_PASSWORD: ReleaseKeyPass2024!
 
       - name: Build APK Release (Main Flavor)
-        run: ./gradlew assembleRsRelease --build-cache --stacktrace || true
+        run: ./gradlew assembleRsRelease --build-cache --stacktrace
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
-          CMD_RELEASE_KEYSTORE: release.keystore
+          CMD_RELEASE_KEYSTORE: ${{ github.workspace }}/release.keystore
           CMD_RELEASE_KEYSTORE_PASSWORD: ReleaseKeyPass2024!
           CMD_RELEASE_KEY_ALIAS: release-key
           CMD_RELEASE_KEY_PASSWORD: ReleaseKeyPass2024!
@@ -109,4 +112,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: rm -f release.keystore keystore.properties
+        run: rm -f release.keystore app/release.keystore keystore.properties app/keystore.properties
