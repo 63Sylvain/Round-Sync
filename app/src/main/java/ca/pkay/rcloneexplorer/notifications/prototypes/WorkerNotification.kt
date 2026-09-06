@@ -186,8 +186,9 @@ abstract class WorkerNotification(var mContext: Context) {
             return null
         }
 
+        val percentText = if (percent > 0) " ($percent%)" else ""
         val builder = GenericSyncNotification(mContext).updateGenericNotification(
-                String.format(serviceOngoingTitle, title),
+                String.format(serviceOngoingTitle, title) + percentText,
                 content,
                 R.drawable.ic_twotone_rounded_cloud_sync_24,
                 bigTextArray,

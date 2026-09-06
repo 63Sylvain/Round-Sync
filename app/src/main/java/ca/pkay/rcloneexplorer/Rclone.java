@@ -691,6 +691,8 @@ public class Rclone {
         ArrayList<String> defaultParameter = new ArrayList<>(Arrays.asList("--transfers", "1", "--stats=1s", "--stats-log-level", "NOTICE", "--use-json-log"));
         ArrayList<String> directionParameter = new ArrayList<>();
 
+        addAndroidStorageExclusions(defaultParameter, localPath);
+
         if(useMD5Sum){
             defaultParameter.add("--checksum");
         }
@@ -715,11 +717,19 @@ public class Rclone {
             Collections.addAll(directionParameter, "copy", localPath, remoteSection);
             directionParameter.addAll(defaultParameter);
             command = createCommandWithOptions(directionParameter);
-        }else if (syncDirection == SyncDirectionObject.COPY_REMOTE_TO_LOCAL) {
+        } else if (syncDirection == SyncDirectionObject.COPY_REMOTE_TO_LOCAL) {
             Collections.addAll(directionParameter, "copy", remoteSection, localPath);
             directionParameter.addAll(defaultParameter);
             command = createCommandWithOptions(directionParameter);
-        }else {
+        } else if (syncDirection == SyncDirectionObject.SYNC_BIDIRECTIONAL_INITIAL) {
+            Collections.addAll(directionParameter, "bisync", localPath, remoteSection, "--resync");
+            directionParameter.addAll(defaultParameter);
+            command = createCommandWithOptions(directionParameter);
+        } else if (syncDirection == SyncDirectionObject.SYNC_BIDIRECTIONAL) {
+            Collections.addAll(directionParameter, "bisync", localPath, remoteSection);
+            directionParameter.addAll(defaultParameter);
+            command = createCommandWithOptions(directionParameter);
+        } else {
             return null;
         }
 
@@ -729,6 +739,37 @@ public class Rclone {
         } catch (IOException e) {
             FLog.e(TAG, "sync: error starting rclone", e);
             return null;
+        }
+    }
+
+    private void addAndroidStorageExclusions(ArrayList<String> parameters, String localPath) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && localPath != null) {
+            String norm = localPath.replace('\\', '/').replaceAll("/+$", "");
+            if (norm.equals("/storage/emulated/0") || norm.matches("^/storage/[^/]+$") || norm.equals("/sdcard")) {
+                parameters.add("--exclude");
+                parameters.add("/Android/data/**");
+                parameters.add("--exclude");
+                parameters.add("/Android/obb/**");
+                parameters.add("--exclude");
+                parameters.add("Android/data/**");
+                parameters.add("--exclude");
+                parameters.add("Android/obb/**");
+            } else if (norm.endsWith("/Android")) {
+                parameters.add("--exclude");
+                parameters.add("/data/**");
+                parameters.add("--exclude");
+                parameters.add("/obb/**");
+                parameters.add("--exclude");
+                parameters.add("data/**");
+                parameters.add("--exclude");
+                parameters.add("obb/**");
+            } else {
+                parameters.add("--exclude");
+                parameters.add("Android/data/**");
+                parameters.add("--exclude");
+                parameters.add("Android/obb/**");
+            }
+            parameters.add("--skip-links");
         }
     }
 

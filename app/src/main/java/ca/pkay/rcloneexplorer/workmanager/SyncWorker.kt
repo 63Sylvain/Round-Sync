@@ -7,11 +7,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
 import android.net.wifi.WifiManager
+import android.os.Build
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.PreferenceManager
 import androidx.work.ForegroundInfo
+import androidx.work.WorkInfo
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import ca.pkay.rcloneexplorer.Database.DatabaseHandler
@@ -26,6 +28,7 @@ import ca.pkay.rcloneexplorer.notifications.SyncServiceNotifications
 import ca.pkay.rcloneexplorer.notifications.SyncServiceNotifications.Companion.GROUP_ID
 import ca.pkay.rcloneexplorer.notifications.support.StatusObject
 import ca.pkay.rcloneexplorer.util.FLog
+import ca.pkay.rcloneexplorer.util.NotificationUtils
 import ca.pkay.rcloneexplorer.util.SyncLog
 import ca.pkay.rcloneexplorer.util.WifiConnectivitiyUtil
 import kotlinx.serialization.json.Json
@@ -80,7 +83,7 @@ class SyncWorker (private var mContext: Context, workerParams: WorkerParameters)
     private var failureReason = FAILURE_REASON.NO_FAILURE
     private var endNotificationAlreadyPosted = false
     private var silentRun = false
-    private val ongoingNotificationID = Random().nextInt()
+    private val ongoingNotificationID = (Math.abs(Random().nextInt()) % 100000) + 1000
 
 
     // Task
@@ -130,15 +133,29 @@ class SyncWorker (private var mContext: Context, workerParams: WorkerParameters)
             return Result.failure()
         }
 
+        if (failureReason != FAILURE_REASON.NO_FAILURE) {
+            return Result.failure()
+        }
+
         // Indicate whether the work finished successfully with the Result
         return Result.success()
     }
 
     override fun onStopped() {
         super.onStopped()
-        SyncLog.info(mContext, mTitle, mContext.getString(R.string.operation_sync_cancelled))
-        SyncLog.info(mContext, mTitle, statusObject.toString())
-        failureReason = FAILURE_REASON.CANCELLED
+        if (endNotificationAlreadyPosted) {
+            return
+        }
+        val isExplicitCancel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            stopReason == WorkInfo.STOP_REASON_CANCELLED_BY_APP || stopReason == WorkInfo.STOP_REASON_USER
+        } else {
+            isStopped
+        }
+        failureReason = if (isExplicitCancel) {
+            FAILURE_REASON.CANCELLED
+        } else {
+            FAILURE_REASON.RCLONE_ERROR
+        }
         finishWork()
     }
 
@@ -187,26 +204,25 @@ class SyncWorker (private var mContext: Context, workerParams: WorkerParameters)
                     val line = iterator.next()
                     try {
                         val logline = JSONObject(line)
-                        //todo: migrate this to StatusObject, so that we can handle everything properly.
-                        if (logline.getString("level") == "error") {
-                            if (sIsLoggingEnabled) {
+                        if (logline.has("stats") || logline.has("level")) {
+                            val level = logline.optString("level", "")
+                            if (level == "error" && sIsLoggingEnabled) {
                                 log2File?.log(line)
                             }
                             statusObject.parseLoglineToStatusObject(logline)
-                        } else if (logline.getString("level") == "warning") {
-                            statusObject.parseLoglineToStatusObject(logline)
                         }
 
-                        updateForegroundNotification(mNotificationManager.updateSyncNotification(
-                            title,
-                            statusObject.notificationContent,
-                            statusObject.notificationBigText,
-                            statusObject.notificationPercent,
-                            ongoingNotificationID
-                        ))
+                        if (statusObject.notificationContent.isNotEmpty()) {
+                            updateForegroundNotification(mNotificationManager.updateSyncNotification(
+                                title,
+                                statusObject.notificationContent,
+                                statusObject.notificationBigText,
+                                statusObject.notificationPercent,
+                                ongoingNotificationID
+                            ))
+                        }
                     } catch (e: JSONException) {
                         FLog.e(TAG, "SyncService-Error: the offending line: $line")
-                        //FLog.e(TAG, "onHandleIntent: error reading json", e)
                     }
                 }
             } catch (e: InterruptedIOException) {
@@ -215,9 +231,20 @@ class SyncWorker (private var mContext: Context, workerParams: WorkerParameters)
                 FLog.e(TAG, "onHandleIntent: error reading stdout", e)
             }
             try {
-                localProcessReference.waitFor()
+                val exitCode = localProcessReference.waitFor()
+                if (exitCode != 0) {
+                    FLog.e(TAG, "rclone process exited with code $exitCode")
+                    if (failureReason == FAILURE_REASON.NO_FAILURE) {
+                        failureReason = FAILURE_REASON.RCLONE_ERROR
+                    }
+                } else if (statusObject.mErrorList.isNotEmpty() && failureReason == FAILURE_REASON.NO_FAILURE) {
+                    failureReason = FAILURE_REASON.RCLONE_ERROR
+                }
             } catch (e: InterruptedException) {
                 FLog.e(TAG, "onHandleIntent: error waiting for process", e)
+                if (failureReason == FAILURE_REASON.NO_FAILURE) {
+                    failureReason = FAILURE_REASON.CANCELLED
+                }
             }
         } else {
             log("Sync: No Rclone Process!")
@@ -279,8 +306,7 @@ class SyncWorker (private var mContext: Context, workerParams: WorkerParameters)
     }
 
     private fun showSuccessNotification(notificationId: Int) {
-        //Todo: Show sync-errors in notification. Also see line 169
-
+        endNotificationAlreadyPosted = true
         var message = generateSuccessMessage(statusObject)
         mNotificationManager.showSuccessNotificationOrReport(
             mTitle,
@@ -408,7 +434,12 @@ class SyncWorker (private var mContext: Context, workerParams: WorkerParameters)
     // ongoing notification.
     private fun updateForegroundNotification(notification: Notification?) {
         notification?.let {
-            setForegroundAsync(ForegroundInfo(ongoingNotificationID, it, FOREGROUND_SERVICE_TYPE_DATA_SYNC))
+            try {
+                setForegroundAsync(ForegroundInfo(ongoingNotificationID, it, FOREGROUND_SERVICE_TYPE_DATA_SYNC))
+            } catch (e: Exception) {
+                FLog.e(TAG, "Failed to setForegroundAsync", e)
+            }
+            NotificationUtils.createNotification(mContext, ongoingNotificationID, it)
         }
     }
 

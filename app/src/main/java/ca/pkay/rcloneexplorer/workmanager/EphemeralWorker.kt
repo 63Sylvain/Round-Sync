@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.PreferenceManager
 import androidx.work.ForegroundInfo
+import androidx.work.WorkInfo
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import ca.pkay.rcloneexplorer.Items.FileItem
@@ -24,6 +25,7 @@ import ca.pkay.rcloneexplorer.Rclone
 import ca.pkay.rcloneexplorer.notifications.prototypes.WorkerNotification
 import ca.pkay.rcloneexplorer.notifications.support.StatusObject
 import ca.pkay.rcloneexplorer.util.FLog
+import ca.pkay.rcloneexplorer.util.NotificationUtils
 import ca.pkay.rcloneexplorer.util.SyncLog
 import ca.pkay.rcloneexplorer.util.WifiConnectivitiyUtil
 import de.felixnuesse.extract.extensions.tag
@@ -81,7 +83,7 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
     private var failureReason = FAILURE_REASON.NO_FAILURE
     private var endNotificationAlreadyPosted = false
     private var silentRun = false
-    private val ongoingNotificationID = Random.nextInt()
+    private val ongoingNotificationID = (Math.abs(Random.nextInt()) % 100000) + 1000
 
 
     private var mTitle: String = mNotificationManager?.initialTitle ?: ""
@@ -175,6 +177,9 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
             }
 
             postSync()
+            if (failureReason != FAILURE_REASON.NO_FAILURE) {
+                return Result.failure()
+            }
             // Indicate whether the work finished successfully with the Result
             return Result.success()
         }
@@ -184,9 +189,19 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
 
     override fun onStopped() {
         super.onStopped()
-        SyncLog.info(mContext, mTitle, mContext.getString(R.string.operation_sync_cancelled))
-        SyncLog.info(mContext, mTitle, statusObject.toString())
-        failureReason = FAILURE_REASON.CANCELLED
+        if (endNotificationAlreadyPosted) {
+            return
+        }
+        val isExplicitCancel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            stopReason == WorkInfo.STOP_REASON_CANCELLED_BY_APP || stopReason == WorkInfo.STOP_REASON_USER
+        } else {
+            isStopped
+        }
+        failureReason = if (isExplicitCancel) {
+            FAILURE_REASON.CANCELLED
+        } else {
+            FAILURE_REASON.RCLONE_ERROR
+        }
         finishWork()
     }
 
@@ -218,26 +233,25 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
                     val line = iterator.next()
                     try {
                         val logline = JSONObject(line)
-                        //todo: migrate this to StatusObject, so that we can handle everything properly.
-                        if (logline.getString("level") == "error") {
-                            if (sIsLoggingEnabled) {
+                        if (logline.has("stats") || logline.has("level")) {
+                            val level = logline.optString("level", "")
+                            if (level == "error" && sIsLoggingEnabled) {
                                 log2File?.log(line)
                             }
                             statusObject.parseLoglineToStatusObject(logline)
-                        } else if (logline.getString("level") == "warning") {
-                            statusObject.parseLoglineToStatusObject(logline)
                         }
 
-                        updateForegroundNotification(mNotificationManager?.updateNotification(
-                            title,
-                            statusObject.notificationContent,
-                            statusObject.notificationBigText,
-                            statusObject.notificationPercent,
-                            ongoingNotificationID
-                        ))
+                        if (statusObject.notificationContent.isNotEmpty()) {
+                            updateForegroundNotification(mNotificationManager?.updateNotification(
+                                title,
+                                statusObject.notificationContent,
+                                statusObject.notificationBigText,
+                                statusObject.notificationPercent,
+                                ongoingNotificationID
+                            ))
+                        }
                     } catch (e: JSONException) {
                         Log.e(tag(), "Error: the offending line: $line")
-                        //FLog.e(TAG, "onHandleIntent: error reading json", e)
                     }
                 }
             } catch (e: InterruptedIOException) {
@@ -246,9 +260,20 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
                 FLog.e(tag(), "onHandleIntent: error reading stdout", e)
             }
             try {
-                localProcessReference.waitFor()
+                val exitCode = localProcessReference.waitFor()
+                if (exitCode != 0) {
+                    FLog.e(tag(), "rclone process exited with code $exitCode")
+                    if (failureReason == FAILURE_REASON.NO_FAILURE) {
+                        failureReason = FAILURE_REASON.RCLONE_ERROR
+                    }
+                } else if (statusObject.mErrorList.isNotEmpty() && failureReason == FAILURE_REASON.NO_FAILURE) {
+                    failureReason = FAILURE_REASON.RCLONE_ERROR
+                }
             } catch (e: InterruptedException) {
                 FLog.e(tag(), "onHandleIntent: error waiting for process", e)
+                if (failureReason == FAILURE_REASON.NO_FAILURE) {
+                    failureReason = FAILURE_REASON.CANCELLED
+                }
             }
         } else {
             log("Sync: No Rclone Process!")
@@ -310,10 +335,7 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
     }
 
     private fun showSuccessNotification(notificationId: Int) {
-        //Todo: Show sync-errors in notification. Also see line 169
-        //Todo: This should be context dependend on the type. It is currently not!
-
-
+        endNotificationAlreadyPosted = true
         var message = mNotificationManager?.generateSuccessMessage(statusObject, getCurrentFile())?: "error"
 
         mNotificationManager?.showSuccessNotification(
@@ -382,11 +404,13 @@ class EphemeralWorker (private var mContext: Context, workerParams: WorkerParame
     // Creates an instance of ForegroundInfo which can be used to update the
     // ongoing notification.
     private fun updateForegroundNotification(notification: Notification?) {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            notification?.let {
+        notification?.let {
+            try {
                 setForegroundAsync(ForegroundInfo(ongoingNotificationID, it, FOREGROUND_SERVICE_TYPE_DATA_SYNC))
+            } catch (e: Exception) {
+                FLog.e(tag(), "Failed to setForegroundAsync", e)
             }
+            NotificationUtils.createNotification(mContext, ongoingNotificationID, it)
         }
     }
 

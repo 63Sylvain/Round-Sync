@@ -45,7 +45,7 @@ class GenericSyncNotification(var mContext: Context) {
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigText.toString()))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
-            .setProgress(100, percent, false)
+            .setProgress(100, percent, percent <= 0 && bigTextArray.isEmpty())
 
         if(cancelIntent != null) {
             notificationBuilder.addAction(

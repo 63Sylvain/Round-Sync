@@ -21,7 +21,8 @@ class StatusObject(var mContext: Context){
     var lastItemAverageSpeed = 0L
 
     fun getSpeed(): String {
-        return Formatter.formatFileSize(mContext, mStats.optLong("speed", 0)) + "/s"
+        val formatted = try { Formatter.formatFileSize(mContext, mStats.optLong("speed", 0)) } catch (e: Exception) { null }
+        return (formatted ?: "${mStats.optLong("speed", 0)} B") + "/s"
     }
 
     /**
@@ -32,23 +33,45 @@ class StatusObject(var mContext: Context){
      * reflect actual network speeds.
      */
     fun getEstimatedAverageSpeed(): String {
-        return Formatter.formatFileSize(mContext, estimatedAverageSpeed) + "/s"
+        val formatted = try { Formatter.formatFileSize(mContext, estimatedAverageSpeed) } catch (e: Exception) { null }
+        return (formatted ?: "$estimatedAverageSpeed B") + "/s"
     }
 
     fun getLastItemAverageSpeed(): String {
-        return Formatter.formatFileSize(mContext, lastItemAverageSpeed) + "/s"
+        val formatted = try { Formatter.formatFileSize(mContext, lastItemAverageSpeed) } catch (e: Exception) { null }
+        return (formatted ?: "$lastItemAverageSpeed B") + "/s"
     }
 
     fun getSize(): String {
-        return Formatter.formatFileSize(mContext, mStats.optLong("bytes", 0))
+        val formatted = try { Formatter.formatFileSize(mContext, mStats.optLong("bytes", 0)) } catch (e: Exception) { null }
+        return formatted ?: "${mStats.optLong("bytes", 0)} B"
     }
 
     fun getTotalSize(): String {
-        return Formatter.formatFileSize(mContext, mStats.optLong("totalBytes", 0))
+        val formatted = try { Formatter.formatFileSize(mContext, mStats.optLong("totalBytes", 0)) } catch (e: Exception) { null }
+        return formatted ?: "${mStats.optLong("totalBytes", 0)} B"
     }
 
     fun getPercentage(): Double {
-        return mStats.optLong("bytes", 0).toDouble() / mStats.optLong("totalBytes", 0) * 100
+        if (mStats.has("percentage")) {
+            val p = mStats.optDouble("percentage", 0.0)
+            if (!p.isNaN() && !p.isInfinite()) {
+                return p.coerceIn(0.0, 100.0)
+            }
+        }
+        val totalBytes = mStats.optLong("totalBytes", 0)
+        if (totalBytes > 0) {
+            val bytes = mStats.optLong("bytes", 0)
+            val pct = (bytes.toDouble() / totalBytes.toDouble()) * 100.0
+            return if (pct.isNaN() || pct.isInfinite()) 0.0 else pct.coerceIn(0.0, 100.0)
+        }
+        val totalTransfers = mStats.optInt("totalTransfers", 0)
+        if (totalTransfers > 0) {
+            val transfers = mStats.optInt("transfers", 0)
+            val pct = (transfers.toDouble() / totalTransfers.toDouble()) * 100.0
+            return if (pct.isNaN() || pct.isInfinite()) 0.0 else pct.coerceIn(0.0, 100.0)
+        }
+        return 0.0
     }
 
     fun getTransfers(): Int {
@@ -64,74 +87,72 @@ class StatusObject(var mContext: Context){
     }
 
     fun getErrorMessage(): String {
-        if(mLogline.has("msg") && mLogline.getString("level") == "error") {
-            return mLogline.getString("msg")
+        if(mLogline.has("msg") && mLogline.optString("level") == "error") {
+            return mLogline.optString("msg", "")
         }
         return ""
     }
 
     fun getErrorObject(): String {
-        if(mLogline.has("msg") && mLogline.getString("level") == "error") {
+        if(mLogline.has("msg") && mLogline.optString("level") == "error") {
             return mLogline.optString("object", "")
         }
         return ""
     }
 
     fun parseLoglineToStatusObject(logLine: JSONObject) {
-        if(logLine.getString("level") == "error") {
-            clearObject()
+        if (logLine.optString("level") == "error") {
             mLogline = logLine
-
-            var error = ErrorObject(getErrorObject(), getErrorMessage())
-            Log.e(TAG, error.mErrorObject + " - " + error.mErrorMessage)
+            val error = ErrorObject(getErrorObject(), getErrorMessage())
+            Log.e(TAG, "${error.mErrorObject} - ${error.mErrorMessage}")
             mErrorList.add(error)
         }
 
-        if(logLine.has("stats")) {
+        if (logLine.has("stats")) {
             clearObject()
             mLogline = logLine
             mStats = mLogline.getJSONObject("stats")
 
-            //available stats:
-            //bytes,checks,deletedDirs,deletes,elapsedTime,errors,eta,fatalError,renames,retryError
-            //speed,totalBytes,totalChecks,totalTransfers,transferTime,transfers
+            // Available stats:
+            // bytes, checks, deletedDirs, deletes, elapsedTime, errors, eta, fatalError, renames, retryError
+            // speed, totalBytes, totalChecks, totalTransfers, transferTime, transfers
 
-            //available stats:
-            //bytes,checks,deletedDirs,deletes,elapsedTime,errors,eta,fatalError,renames,retryError
-            //speed,totalBytes,totalChecks,totalTransfers,transferTime,transfers
-
-
-            // when we check stuff, dont show the other messages.
             val checks = mStats.optJSONArray("checking")
-            if(checks != null) {
-                var filename = checks.getString(0)
-                if(!filename.equals("")) {
+            if (checks != null && checks.length() > 0) {
+                val filename = checks.optString(0, "")
+                if (filename.isNotEmpty()) {
                     notificationBigText.add(
                         String.format(
                             mContext.getString(R.string.sync_notification_elapsed),
-                            prettyPrintDuration(mStats.getInt("elapsedTime"))
+                            prettyPrintDuration(mStats.optInt("elapsedTime", 0))
                         )
                     )
-
                     notificationBigText.add(
                         String.format(
                             mContext.getString(R.string.sync_notification_file_checking),
                             filename
                         )
                     )
+                    notificationContent = String.format(
+                        mContext.getString(R.string.sync_notification_file_checking),
+                        filename
+                    )
+                    notificationPercent = 0
+                    return
                 }
-                return
             }
 
-            if(mStats.has("transferring")) {
-                val transferring = mStats.getJSONArray("transferring").getJSONObject(0)
-                lastItemAverageSpeed = transferring.optLong("speedAvg", 0)
-
-                val divisor = mStats.getInt("elapsedTime")
-                estimatedAverageSpeed = if(divisor != 0) {
-                    mStats.optLong("bytes", 0) / divisor
-                } else {
-                    0
+            val transferringArray = mStats.optJSONArray("transferring")
+            if (transferringArray != null && transferringArray.length() > 0) {
+                val transferring = transferringArray.optJSONObject(0)
+                if (transferring != null) {
+                    lastItemAverageSpeed = transferring.optLong("speedAvg", 0)
+                    val divisor = mStats.optInt("elapsedTime", 0)
+                    estimatedAverageSpeed = if (divisor != 0) {
+                        mStats.optLong("bytes", 0) / divisor
+                    } else {
+                        0
+                    }
                 }
             }
 
@@ -139,78 +160,86 @@ class StatusObject(var mContext: Context){
             val size = getSize()
             val allsize = getTotalSize()
             val percent: Double = getPercentage()
+            notificationPercent = percent.toInt().coerceIn(0, 100)
 
-            notificationContent = String.format(
-                mContext.getString(R.string.sync_notification_short),
-                size,
-                allsize,
-                prettyPrintDuration(mStats.optInt("eta", 0))
-            )
-            notificationBigText.clear()
-            notificationBigText.add(
+            val percentStr = "${notificationPercent}%"
+            val baseShortContent = try {
                 String.format(
-                    mContext.getString(R.string.sync_notification_transferred),
+                    mContext.getString(R.string.sync_notification_short),
                     size,
-                    allsize
-                )
-            )
-
-            if (getDeletions() > 0) {
-                notificationBigText.add(
-                        String.format(
-                                mContext.getString(R.string.sync_notification_deletions),
-                                getDeletions()
-                        )
-                )
-            }
-
-            notificationBigText.add(
-                String.format(
-                    mContext.getString(R.string.sync_notification_speed),
-                    speed
-                )
-            )
-
-            var eta = mStats.get("eta")
-            if(eta == null) {
-                eta = "0";
-            }
-
-            notificationBigText.add(
-                String.format(
-                    mContext.getString(R.string.sync_notification_remaining),
+                    allsize,
                     prettyPrintDuration(mStats.optInt("eta", 0))
                 )
-            )
-            if (mStats.getInt("errors") > 0) {
+            } catch (e: Exception) {
+                "$size / $allsize"
+            }
+            notificationContent = "$percentStr • $baseShortContent"
+
+            try {
+                notificationBigText.clear()
                 notificationBigText.add(
                     String.format(
-                        mContext.getString(R.string.sync_notification_errors),
-                        mStats.getInt("errors")
+                        mContext.getString(R.string.sync_notification_transferred),
+                        size,
+                        allsize
+                    ) + " ($percentStr)"
+                )
+
+                if (getDeletions() > 0) {
+                    notificationBigText.add(
+                        String.format(
+                            mContext.getString(R.string.sync_notification_deletions),
+                            getDeletions()
+                        )
+                    )
+                }
+
+                notificationBigText.add(
+                    String.format(
+                        mContext.getString(R.string.sync_notification_speed),
+                        speed
                     )
                 )
-            }
 
-            notificationBigText.add(
-                String.format(
-                    mContext.getString(R.string.sync_notification_elapsed),
-                    prettyPrintDuration(mStats.getInt("elapsedTime"))
+                val etaSeconds = mStats.optInt("eta", 0)
+                notificationBigText.add(
+                    String.format(
+                        mContext.getString(R.string.sync_notification_remaining),
+                        prettyPrintDuration(etaSeconds)
+                    )
                 )
-            )
 
-            val transfers = mStats.optJSONArray("transferring")
-            if(transfers != null) {
-                val transferObject = transfers.getJSONObject(0)
-                var filename = transferObject.optString("name", "")
-                if(!filename.equals("")) {
-                    notificationBigText.add(String.format(
-                        mContext.getString(R.string.sync_notification_file_syncing),
-                        filename
-                    ))
+                if (mStats.optInt("errors", 0) > 0) {
+                    notificationBigText.add(
+                        String.format(
+                            mContext.getString(R.string.sync_notification_errors),
+                            mStats.optInt("errors", 0)
+                        )
+                    )
                 }
-            }
 
-            notificationPercent = percent.toInt()
+                notificationBigText.add(
+                    String.format(
+                        mContext.getString(R.string.sync_notification_elapsed),
+                        prettyPrintDuration(mStats.optInt("elapsedTime", 0))
+                    )
+                )
+
+                if (transferringArray != null && transferringArray.length() > 0) {
+                    val transferObject = transferringArray.optJSONObject(0)
+                    val filename = transferObject?.optString("name", "") ?: ""
+                    if (filename.isNotEmpty()) {
+                        notificationBigText.add(
+                            String.format(
+                                mContext.getString(R.string.sync_notification_file_syncing),
+                                filename
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                // If context resources are unavailable (e.g. unit test), fallback gracefully
+            }
         }
     }
 
@@ -237,7 +266,11 @@ class StatusObject(var mContext: Context){
     }
 
     override fun toString(): String {
-        return "StatusObject(getPercentage=${getPercentage()}, getSpeed=${getSpeed()}, getEstimatedAverageSpeed=${getEstimatedAverageSpeed()}, getLastItemAverageSpeed=${getLastItemAverageSpeed()}, getSize=${getSize()}, getTotalSize=${getTotalSize()}, getTransfers=${getTransfers()}, getTotalTransfers=${getTotalTransfers()}, getErrorMessage=${getErrorMessage()}, getDeletions=${getDeletions()})"
+        val pct = getPercentage()
+        val pctFormatted = if (pct.isNaN()) "0%" else String.format(java.util.Locale.US, "%.1f%%", pct)
+        val errorMsg = getErrorMessage()
+        val errPart = if (errorMsg.isNotEmpty()) " - Error: $errorMsg" else ""
+        return "Progress: $pctFormatted ($notificationPercent%), Transferred: ${getSize()} / ${getTotalSize()}, Speed: ${getSpeed()}$errPart"
     }
 
 
