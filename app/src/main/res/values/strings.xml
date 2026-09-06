@@ -630,4 +630,7 @@
     <string name="pref_proxy_password">Password</string>
     <string name="intro_update_checks_title">Update Notifications</string>
     <string name="intro_update_checks_description">If you want to recieve updates, you can enable the switch below! We will notify if an update is available, and you can then choose to apply it.</string>
+    <string name="crypt_remote_field_hint">Target remote to encrypt/decrypt</string>
+    <string name="crypt_remote_field_helper">Select an existing remote or specify a path (e.g. Google Drive: or Google Drive:secret)</string>
 </resources>
+

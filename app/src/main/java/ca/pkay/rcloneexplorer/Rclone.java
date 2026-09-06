@@ -78,10 +78,15 @@ public class Rclone {
 
     public Rclone(Context context) {
         this.context = context;
-        this.rclone = context.getApplicationInfo().nativeLibraryDir + "/librclone.so";
-        this.rcloneConf = context.getFilesDir().getPath() + "/rclone.conf";
-        log2File = new Log2File(context);
+        if (context != null) {
+            android.content.pm.ApplicationInfo appInfo = context.getApplicationInfo();
+            this.rclone = (appInfo != null && appInfo.nativeLibraryDir != null ? appInfo.nativeLibraryDir : "") + "/librclone.so";
+            File filesDir = context.getFilesDir();
+            this.rcloneConf = (filesDir != null ? filesDir.getPath() : "") + "/rclone.conf";
+            this.log2File = new Log2File(context);
+        }
     }
+
 
     private String[] createCommand(ArrayList<String> args) {
         String[] command = new String[args.size()];
@@ -379,10 +384,43 @@ public class Rclone {
 
                 RemoteItem newRemote = new RemoteItem(key, type);
                 if (type.equals("crypt") || type.equals("alias") || type.equals("cache")) {
-                    newRemote = getRemoteType(remotesJSON, newRemote, key, 8);
-                    if (newRemote == null) {
-                        Toasty.error(context, context.getResources().getString(R.string.error_retrieving_remote, key), Toast.LENGTH_SHORT, true).show();
-                        continue;
+                    String targetRemote = remoteJSON.optString("remote").trim();
+                    if (!targetRemote.isEmpty() && !targetRemote.contains(":") && !targetRemote.startsWith("/")) {
+                        Iterator<String> kIt = remotesJSON.keys();
+                        String match = null;
+                        String sub = "";
+                        while (kIt.hasNext()) {
+                            String otherKey = kIt.next();
+                            if (otherKey.equalsIgnoreCase(key)) continue;
+                            if (otherKey.equalsIgnoreCase(targetRemote)) {
+                                match = otherKey;
+                                break;
+                            } else if (targetRemote.toLowerCase().startsWith(otherKey.toLowerCase() + "/")) {
+                                match = otherKey;
+                                sub = targetRemote.substring(otherKey.length() + 1);
+                                break;
+                            }
+                        }
+                        if (match != null) {
+                            String correctedTarget = match + ":" + sub;
+                            try {
+                                remoteJSON.put("remote", correctedTarget);
+                            } catch (JSONException ignored) {}
+                            autoFixRemoteTarget(key, correctedTarget);
+                        }
+                    }
+
+                    RemoteItem resolved = getRemoteType(remotesJSON, newRemote, key, 8);
+                    if (resolved != null) {
+                        newRemote = resolved;
+                    } else {
+                        if (type.equals("crypt")) {
+                            newRemote.setIsCrypt(true);
+                        } else if (type.equals("alias")) {
+                            newRemote.setIsAlias(true);
+                        } else if (type.equals("cache")) {
+                            newRemote.setIsCache(true);
+                        }
                     }
                 }
 
@@ -430,63 +468,122 @@ public class Rclone {
         return Runtime.getRuntime().exec(command, env);
     }
 
-    @Nullable
-    private RemoteItem getRemoteType(JSONObject remotesJSON, RemoteItem remoteItem, String remoteName, int maxDepth) {
+    @NonNull
+    RemoteItem getRemoteType(JSONObject remotesJSON, @NonNull RemoteItem remoteItem, String remoteName, int maxDepth) {
+        if (remoteName == null || remoteName.trim().isEmpty() || maxDepth <= 0) {
+            return remoteItem;
+        }
+
         Iterator<String> iterator = remotesJSON.keys();
+        String matchingKey = null;
 
         while (iterator.hasNext()) {
             String key = iterator.next();
+            if (key.trim().equalsIgnoreCase(remoteName.trim())) {
+                matchingKey = key;
+                break;
+            }
+        }
 
-            if (!key.equals(remoteName)) {
-                continue;
+        if (matchingKey == null) {
+            return remoteItem;
+        }
+
+        try {
+            JSONObject remoteJSON = remotesJSON.optJSONObject(matchingKey);
+            if (remoteJSON == null) {
+                remoteJSON = new JSONObject(remotesJSON.get(matchingKey).toString());
+            }
+            String type = remoteJSON.optString("type");
+            if (type.trim().isEmpty()) {
+                return remoteItem;
             }
 
-            try {
-                JSONObject remoteJSON = new JSONObject(remotesJSON.get(key).toString());
-                String type = remoteJSON.optString("type");
-                if (type.trim().isEmpty()) {
-                    return null;
+            boolean recurse = true;
+            switch (type) {
+                case "crypt":
+                    remoteItem.setIsCrypt(true);
+                    break;
+                case "alias":
+                    remoteItem.setIsAlias(true);
+                    break;
+                case "cache":
+                    remoteItem.setIsCache(true);
+                    break;
+                default:
+                    recurse = false;
+            }
+
+            if (recurse) {
+                String remote = remoteJSON.optString("remote").trim();
+                if (remote.isEmpty()) {
+                    remoteItem.setType(type);
+                    return remoteItem;
                 }
 
-                boolean recurse = true;
-                switch (type) {
-                    case "crypt":
-                        remoteItem.setIsCrypt(true);
-                        break;
-                    case "alias":
-                        remoteItem.setIsAlias(true);
-                        break;
-                    case "cache":
-                        remoteItem.setIsCache(true);
-                        break;
-                    default:
-                        recurse = false;
+                // Local paths
+                if (remote.startsWith("/") || remote.startsWith("~/") || remote.startsWith("storage/") || remote.startsWith("sdcard/")) {
+                    remoteItem.setType("local");
+                    remoteItem.setIsPathAlias(true);
+                    return remoteItem;
                 }
 
-                if (recurse && maxDepth > 0) {
-                    String remote = remoteJSON.optString("remote");
-                    if (remote.trim().isEmpty() || (!remote.contains(":") && !remote.startsWith("/"))) {
-                        return null;
-                    }
-
-                    if (remote.startsWith("/")) { // local remote
+                // Explicit colon notation (e.g. "Google Drive:" or "Google Drive:folder")
+                if (remote.contains(":")) {
+                    int index = remote.indexOf(":");
+                    String targetRemote = remote.substring(0, index).trim();
+                    if (targetRemote.isEmpty()) {
+                        // ":path" is local filesystem
                         remoteItem.setType("local");
                         remoteItem.setIsPathAlias(true);
                         return remoteItem;
                     } else {
-                        int index = remote.indexOf(":");
-                        remote = remote.substring(0, index);
-                        return getRemoteType(remotesJSON, remoteItem, remote, --maxDepth);
+                        return getRemoteType(remotesJSON, remoteItem, targetRemote, maxDepth - 1);
+                    }
+                } else {
+                    // No colon notation: check if it matches an existing remote directly or with subpath
+                    String targetCandidate = remote;
+                    int slashIndex = remote.indexOf("/");
+                    if (slashIndex > 0) {
+                        targetCandidate = remote.substring(0, slashIndex).trim();
+                    }
+                    Iterator<String> checkKeys = remotesJSON.keys();
+                    String matchedKey = null;
+                    while (checkKeys.hasNext()) {
+                        String k = checkKeys.next();
+                        if (k.trim().equalsIgnoreCase(targetCandidate)) {
+                            matchedKey = k;
+                            break;
+                        }
+                    }
+                    if (matchedKey != null) {
+                        return getRemoteType(remotesJSON, remoteItem, matchedKey, maxDepth - 1);
                     }
                 }
-                remoteItem.setType(type);
-                return remoteItem;
-            } catch (JSONException e) {
-                FLog.e(TAG, "getRemoteType: error decoding remote type", e);
             }
+            remoteItem.setType(type);
+            return remoteItem;
+        } catch (JSONException e) {
+            FLog.e(TAG, "getRemoteType: error decoding remote type", e);
+            return remoteItem;
         }
+    }
 
-        return null;
+    private void autoFixRemoteTarget(String name, String fixedTarget) {
+        new Thread(() -> {
+            try {
+                List<String> options = new ArrayList<>();
+                options.add(name);
+                options.add("remote");
+                options.add(fixedTarget);
+                Process process = config("update", options);
+                if (process != null) {
+                    process.waitFor();
+                }
+            } catch (Exception e) {
+                FLog.e(TAG, "autoFixRemoteTarget: error updating rclone config", e);
+            }
+        }).start();
     }
 
     @Nullable
@@ -549,6 +646,19 @@ public class Rclone {
         }
 
         JSONObject selectedConfig = configs.optJSONObject(name);
+        if (selectedConfig == null) {
+            Iterator<String> it = configs.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                if (k.trim().equalsIgnoreCase(name.trim())) {
+                    selectedConfig = configs.optJSONObject(k);
+                    break;
+                }
+            }
+        }
+        if (selectedConfig == null) {
+            return null;
+        }
         Iterator<String> keys = selectedConfig.keys();
 
         while(keys.hasNext()) {
@@ -558,6 +668,7 @@ public class Rclone {
 
         options.put(RCLONE_CONFIG_NAME_KEY,  name);
         return options;
+
         
     }
 

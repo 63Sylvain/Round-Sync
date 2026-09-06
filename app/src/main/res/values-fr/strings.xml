@@ -8,4 +8,7 @@
     <string name="advanced_options_toggle_hide">Masquer les options avancées</string>
     <string name="oauth_waiting_in_browser">Une fenêtre de navigateur s\'est ouverte. Connectez-vous avec votre compte et autorisez l\'accès.</string>
     <string name="oauth_reopen_browser">Rouvrir le navigateur</string>
+    <string name="crypt_remote_field_hint">Remote cible à chiffrer/déchiffrer</string>
+    <string name="crypt_remote_field_helper">Sélectionnez un remote existant ou spécifiez un chemin (ex: Google Drive: ou Google Drive:secret)</string>
 </resources>
+

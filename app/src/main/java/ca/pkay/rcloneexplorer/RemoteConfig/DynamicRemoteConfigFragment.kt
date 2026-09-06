@@ -386,6 +386,8 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
                         updateValue(input, it)
                         setTextInputListener(input, it.name)
 
+                    } else if (it.name == "remote" && (mProviderTitle.equals("crypt", ignoreCase = true) || mProviderTitle.equals("alias", ignoreCase = true))) {
+                        createRemoteSelector(it, layout)
                     } else if(it.examples.size > 0 && it.type != "CommaSepList") {
                         createSpinnerFromExample(it, it.name ,layout)
                     } else {
@@ -394,6 +396,7 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
                         updateValue(input, it)
                         setTextInputListener(input, it.name)
                     }
+
                 }
                 "bool" -> {
                     val input = CheckBox(mContext)
@@ -510,7 +513,53 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
         return input
     }
 
+    private fun createRemoteSelector(option: ProviderOption, layout: LinearLayout): View {
+        val padding = resources.getDimensionPixelOffset(R.dimen.cardPadding)
 
+        val textInput = TextInputLayout(ContextThemeWrapper(mContext, com.google.android.material.R.style.Widget_MaterialComponents_TextInputLayout_OutlinedBox_ExposedDropdownMenu))
+        textInput.hint = getString(R.string.crypt_remote_field_hint)
+        textInput.helperText = getString(R.string.crypt_remote_field_helper)
+        textInput.boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+        textInput.setPadding(0, padding, 0, 0)
+
+        val autoComplete = AutoCompleteTextView(textInput.context)
+        autoComplete.setPadding(padding)
+        autoComplete.setTextColor(convertAttributeToColor(R.attr.colorOnSecondaryContainer))
+        autoComplete.layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+
+        val existingRemotes = mutableListOf<String>()
+        try {
+            val remotes = rclone?.remotes ?: emptyList()
+            for (r in remotes) {
+                if (mIsEditTask && r.name.equals(mRemoteName?.text?.toString(), ignoreCase = true)) {
+                    continue
+                }
+                existingRemotes.add("${r.name}:")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching remotes for crypt remote selector", e)
+        }
+
+        if (existingRemotes.isNotEmpty()) {
+            val adapter = ArrayAdapter(mContext, android.R.layout.simple_dropdown_item_1line, existingRemotes)
+            autoComplete.setAdapter(adapter)
+            autoComplete.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    autoComplete.showDropDown()
+                }
+            }
+            autoComplete.setOnClickListener {
+                autoComplete.showDropDown()
+            }
+        }
+
+        textInput.addView(autoComplete)
+        layout.addView(textInput)
+
+        updateValue(autoComplete, option)
+        setTextInputListener(autoComplete, option.name)
+        return autoComplete
+    }
 
     private fun createSuffixSelector(option: ProviderOption): View {
         val padding = resources.getDimensionPixelOffset(R.dimen.cardPadding)
@@ -691,12 +740,36 @@ class DynamicRemoteConfigFragment(private val mProviderTitle: String, private va
                 options.add("false")
             }
         }
+
+        if (mProviderTitle.equals("crypt", ignoreCase = true) || mProviderTitle.equals("alias", ignoreCase = true)) {
+            var remoteVal = mOptionMap["remote"]?.trim() ?: ""
+            if (remoteVal.isNotEmpty()) {
+                if (remoteVal.startsWith("storage/", ignoreCase = true) || remoteVal.startsWith("sdcard/", ignoreCase = true)) {
+                    remoteVal = "/$remoteVal"
+                } else if (!remoteVal.contains(":") && !remoteVal.startsWith("/")) {
+                    val existing = try { rclone?.remotes ?: emptyList() } catch (e: Exception) { emptyList() }
+                    for (r in existing) {
+                        if (r.name.equals(remoteVal, ignoreCase = true)) {
+                            remoteVal = "${r.name}:"
+                            break
+                        } else if (remoteVal.startsWith("${r.name}/", ignoreCase = true)) {
+                            val sub = remoteVal.substring(r.name.length + 1)
+                            remoteVal = "${r.name}:$sub"
+                            break
+                        }
+                    }
+                }
+                mOptionMap["remote"] = remoteVal
+            }
+        }
+
         for ((key, value) in mOptionMap) {
             if (value.isNotBlank()) {
                 options.add(key)
                 options.add(value)
             }
         }
+
 
         if(mIsEditTask) {
             RemoteConfigHelper.updateAndWait(context, options)
