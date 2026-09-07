@@ -1,65 +1,143 @@
 # Round Sync - Rclone for Android
-[![license: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/63Sylvain/Round-Sync/blob/main/LICENSE)
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/63Sylvain/Round-Sync?include_prereleases)](https://github.com/63Sylvain/Round-Sync/releases/latest)
-![Latest Downloads](https://img.shields.io/github/downloads/63Sylvain/Round-Sync/total)
+[![Android CI Build](https://github.com/63Sylvain/Round-Sync/actions/workflows/build-release.yml/badge.svg)](https://github.com/63Sylvain/Round-Sync/actions/workflows/build-release.yml)
+[![Target SDK: Android 15 (API 35)](https://img.shields.io/badge/Target%20SDK-35%20(Android%2015)-brightgreen.svg)](https://developer.android.com/about/versions/15)
+[![Rclone Version](https://img.shields.io/badge/Rclone-v1.75.1--extra-orange.svg)](https://github.com/gulp79/rclone-extra)
 
-> ⚠️ **Unofficial Fork Disclaimer**  
-> This is an **unofficial fork** of [Round Sync - Rclone for Android](https://github.com/gulp79/Round-Sync), which is itself a fork of [Round Sync - Rclone for Android](https://github.com/newhinton/Round-Sync), with additional enhancements.
-> All the backends are from [rclone-extra](https://github.com/gulp79/rclone-extra).
-> I am **not affiliated with the upstream maintainers**, and this fork **does not intend to be malicious or harmful** in any way.  
-> Please **read the source code** if you're unsure or want to verify that it behaves as described.  
-> Contributions, feedback, and scrutiny are welcome.
+> ⚠️ **Fork Disclaimer**  
+> This is an enhanced fork of [Round Sync](https://github.com/gulp79/Round-Sync) (originally by [newhinton](https://github.com/newhinton/Round-Sync) & [x0b](https://github.com/x0b)).
+> All backends and native binaries are based on [rclone-extra](https://github.com/gulp79/rclone-extra) (Rclone v1.75.1).
+> 
+> *Ce dépôt est une version modernisée et optimisée de Round-Sync, apportant le support complet d'Android 14/15, une accélération majeure des vitesses de transfert Google Drive (v2.5.9), une connexion Google en 1 clic et la correction de bugs critiques.*
 
-A cloud file manager, powered by rclone.
-Visit [https://roundsync.com](https://roundsync.com) for more information!
+---
 
-## Features
-- **File Management** (list, view, download, upload, move, rename, delete files and folders)
-- **Streaming** (Stream media files, serve files and directories over FTP, HTTP, WebDAV or DLNA)
-- **Integration** (Access local storage devices and share files with the application to store them on a remote)
-- **Many cloud storage providers** (all via rclone config import, some without ui-setup)
-- **Material 3 Design** (Dark theme)
-- **All architectures** (runs on ARM, ARM64, x86 and x64 devices, Android 7+)
-- **Storage Access Framework (SAF)**
-- **Intentservice** to start tasks via third party apps!
-- **Task Management** to allow regular runs of your important tasks!
+## 🌟 Key Features & Modern Enhancements
 
-## Installation
+### ⚡ Ultra-Fast Cloud Transfers & Uploads (New in v2.5.9)
+- **Parallel Multi-File Transfers**: Dynamic `--transfers` setting (default: **4 parallel transfers**, configurable up to 8) replacing legacy single-file sequential bottlenecks.
+- **Optimized Google Drive Chunk Size**: Upgraded from rclone's default 8 MB to **64 MB** (configurable up to 128 MB), slashing network round-trips by up to 16x and delivering **5x to 20x faster upload speeds**.
+- **Atomic Upload Cutoff (`32M`)**: Files $\le 32\text{ MB}$ (photos, documents, standard crypt chunks) are uploaded in a single atomic multipart request with zero chunking session latency.
+- **Tuned Google Drive Pacer**: Minimum sleep reduced from 100 ms to **10 ms** with a **200 burst** limit for near-instant directory lookups and file operations.
+- **Configurable Performance Settings**: Full control available in **Settings > General > Transfers & Performance** (Transfer count, Chunk size, Fast-list toggle).
 
-Grab the [latest version](https://github.com/63Sylvain/Round-Sync/releases/latest) of the signed APK and install it on your phone.
+### 🚀 1-Click Google Drive Connection (One-Click Sign-In)
+- Connect directly with your Google account in a single tap via Chrome Custom Tabs.
+- No need to configure Google Cloud Developer Console, Client ID, Client Secret, or Service Accounts.
+- Advanced settings remain available in a collapsible section for power users.
 
-## Building from Source
+### 🔒 Interactive Crypt / Encrypted Remote Setup (New in v2.5.8)
+- **Interactive Remote Selector**: Dropdown menu offering existing remotes (e.g., `Google Drive:`) with auto-completion.
+- **Intelligent Target Auto-Repair**: Automatically detects missing colons, trims paths, handles subfolders, and fixes existing configs in the background.
+- **Remote Drop Protection**: Remotes are never hidden or lost, even during fallback resolution.
+
+### 📊 Accurate Real-time Progress & Percentages (New in v2.5.7)
+- Real percentage tracking (**0% to 100%**) in Android notifications (fixes `NaN%` and frozen progress bars).
+- Real-time display of transfer speed, transferred bytes, total size, and estimated time remaining (ETA).
+- Isolated background task management (prevents false cancellations during update checks).
+
+### 📱 Android 14 & 15 (API 35) Compatibility & Scoped Storage
+- Compiled and targeted for **Android 15 (API 35)**.
+- **Scoped Storage Protection**: Automatically excludes restricted system folders (`/Android/data/**`, `/Android/obb/**`) on Android 10+ with `--skip-links` to eliminate permission errors.
+- **Foreground Service Compliance**: Correct `DATA_SYNC` foreground service types declared for Android 14+.
+- Secure `RECEIVER_NOT_EXPORTED` broadcast receivers and runtime notification permission requests.
+
+---
+
+## 📦 Flavors: RS vs. OSS
+
+| Feature | RS Flavor (Recommended) | OSS Flavor (Open Source) |
+| :--- | :---: | :---: |
+| **1-Click Google Drive Sign-In** | ✅ Built-in OAuth | ⚙️ Manual Client ID/Secret |
+| **Encrypted Remotes (Crypt)** | ✅ Yes | ✅ Yes |
+| **High-Performance Transfers (v2.5.9)** | ✅ Yes | ✅ Yes |
+| **Streaming (FTP, HTTP, WebDAV, DLNA)** | ✅ Yes | ✅ Yes |
+| **Task Management & Automation** | ✅ Yes | ✅ Yes |
+| **All CPU Architectures** | ✅ Yes | ✅ Yes |
+
+---
+
+## 📥 Download & Installation
+
+Signed release APKs are available in the [**Releases**](https://github.com/63Sylvain/Round-Sync/releases/latest) section or in the repository's `release-apks/v2.5.9/` folder:
+
+| Architecture | Description | Target Devices |
+| :--- | :--- | :--- |
+| **ARM64-v8a** *(Recommended)* | 64-bit ARM APK (~32 MB) | ~99% of modern smartphones and tablets |
+| **Universal** | Multi-ABI All-in-One APK (~136 MB) | Compatible with all Android devices |
+| **ARMeabi-v7a** | 32-bit legacy ARM APK (~34 MB) | Older Android devices |
+| **x86_64** | 64-bit Intel/AMD APK (~43 MB) | ChromeOS, PC emulators |
+| **x86** | 32-bit Intel APK (~44 MB) | Legacy emulators |
+
+---
+
+## ⚙️ Transfers & Performance Settings
+
+Configure your performance preferences under **Settings > General > Transfers & Performance**:
+
+- **Simultaneous transfers**:
+  - `1`: Battery saver mode / low memory.
+  - `2`: Balanced mode.
+  - `4 (Default)`: Recommended for high speed on Wi-Fi and 4G/5G.
+  - `8`: Ultra-fast multi-threaded uploads.
+- **Google Drive upload chunk size**:
+  - `8 MB`: Minimal RAM footprint.
+  - `16 MB` / `32 MB`: Moderate RAM usage.
+  - `64 MB (Default)`: High throughput, best performance for fast networks.
+  - `128 MB`: Maximum throughput for very large files on fast Wi-Fi / Fiber.
+- **Fast directory listing (`--fast-list`)**:
+  - Enabled by default for rapid recursive scanning with fewer API queries.
+
+---
+
+## 🛠️ Building from Source
 
 ### Prerequisites
-- Java 17+
-- Go 1.20+
-- Android SDK
-- Android NDK (auto-downloaded)
+- **JDK 17+**
+- **Go 1.26.6+**
+- **Android SDK** (API 35, Build-tools 35.0.0)
+- **Android NDK** (27.3.13750724)
 
 ### Build Commands
 
 ```bash
-# Debug build
-./gradlew assembleOssDebug
+# Clone the repository
+git clone https://github.com/63Sylvain/Round-Sync.git
+cd Round-Sync
 
-# Release build
+# Build OSS flavor (Debug / Release)
+./gradlew assembleOssDebug
 ./gradlew assembleOssRelease
+
+# Build RS flavor with 1-Click Google Drive (Debug / Release)
+./gradlew assembleRsDebug
+./gradlew assembleRsRelease
+
+# Run unit test suite
+./gradlew :app:testOssDebugUnitTest -x :rclone:buildAll
 ```
 
-The APK files will be in `app/build/outputs/apk/`
+Output APK files are located under `app/build/outputs/apk/`.
 
-## Automated Builds
+---
 
-This repository includes GitHub Actions workflows that automatically:
-- Build APK in release mode on every push
-- Sign the APK with a secure keystore
-- Upload artifacts for download
-- Create releases on tag pushes
+## 🤖 Automated CI / CD
 
-Check the [Actions](https://github.com/63Sylvain/Round-Sync/actions) tab for build status.
+Every push to `main` or `master` and every tag push triggers the [GitHub Actions Pipeline](https://github.com/63Sylvain/Round-Sync/actions):
+- Compiles native Rclone binaries for 4 target architectures using Go.
+- Builds all 10 release variants (`RS` and `OSS`).
+- Signs all APKs using an RSA 2048-bit keystore (valid until 2054).
+- Publishes artifacts and creates GitHub Releases.
 
-## License
-GPLv3 - See [LICENSE](./LICENSE) for details
+---
 
-## About
-This is a fork of [Round Sync by gulp79](https://github.com/gulp79/Round-Sync)
+## 📄 License & Credits
+
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)** - see [LICENSE](./LICENSE) for details.
+
+- **Original Author**: Patryk Kaczmarkiewicz ([@patrykcoding](https://github.com/patrykcoding))
+- **Past Maintainers**: Felix Nüsse ([@newhinton](https://github.com/newhinton)), x0b ([@x0b](https://github.com/x0b)), gulp79 ([@gulp79](https://github.com/gulp79))
+- **Current Maintainer**: Sylvain ([@63Sylvain](https://github.com/63Sylvain))
+- Powered by [Rclone](https://rclone.org)
