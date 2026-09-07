@@ -10,7 +10,7 @@
 > This is an enhanced fork of [Round Sync](https://github.com/gulp79/Round-Sync) (originally by [newhinton](https://github.com/newhinton/Round-Sync) & [x0b](https://github.com/x0b)).
 > All backends and native binaries are based on [rclone-extra](https://github.com/gulp79/rclone-extra) (Rclone v1.75.1).
 > 
-> *Ce dépôt est une version modernisée et optimisée de Round-Sync, apportant le support complet d'Android 14/15, une accélération majeure des vitesses de transfert Google Drive (v2.5.9), une connexion Google en 1 clic et la correction de bugs critiques.*
+> *This repository is a modernized and high-performance edition of Round-Sync, delivering full Android 14/15 compatibility, massive Google Drive transfer speed optimizations (v2.5.9), seamless 1-click Google Drive sign-in, and critical bug fixes.*
 
 ---
 
