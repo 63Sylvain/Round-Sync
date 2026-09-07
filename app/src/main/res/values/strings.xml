@@ -632,5 +632,21 @@
     <string name="intro_update_checks_description">If you want to recieve updates, you can enable the switch below! We will notify if an update is available, and you can then choose to apply it.</string>
     <string name="crypt_remote_field_hint">Target remote to encrypt/decrypt</string>
     <string name="crypt_remote_field_helper">Select an existing remote or specify a path (e.g. Google Drive: or Google Drive:secret)</string>
+    <string name="preference_category_header_transfers_performance">Transfers &amp; Performance</string>
+    <string name="pref_transfers_title">Simultaneous transfers</string>
+    <string name="pref_transfers_summary">Number of files transferred in parallel (default: 4)</string>
+    <string name="pref_drive_chunk_size_title">Google Drive upload chunk size</string>
+    <string name="pref_drive_chunk_size_summary">Larger chunks significantly boost upload speeds on fast connections (default: 64 MB)</string>
+    <string name="pref_fast_list_title">Fast directory listing</string>
+    <string name="pref_fast_list_summary">Uses fewer API requests to list directories faster on cloud storage</string>
+    <string name="transfers_1">1 (Battery saver)</string>
+    <string name="transfers_2">2</string>
+    <string name="transfers_4">4 (Recommended)</string>
+    <string name="transfers_8">8 (Ultra fast)</string>
+    <string name="drive_chunk_size_8m">8 MB (Minimal RAM)</string>
+    <string name="drive_chunk_size_16m">16 MB</string>
+    <string name="drive_chunk_size_32m">32 MB</string>
+    <string name="drive_chunk_size_64m">64 MB (Recommended - Fast)</string>
+    <string name="drive_chunk_size_128m">128 MB (Ultra fast)</string>
 </resources>
 

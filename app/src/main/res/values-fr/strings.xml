@@ -10,5 +10,21 @@
     <string name="oauth_reopen_browser">Rouvrir le navigateur</string>
     <string name="crypt_remote_field_hint">Remote cible à chiffrer/déchiffrer</string>
     <string name="crypt_remote_field_helper">Sélectionnez un remote existant ou spécifiez un chemin (ex: Google Drive: ou Google Drive:secret)</string>
+    <string name="preference_category_header_transfers_performance">Transferts &amp; Performances</string>
+    <string name="pref_transfers_title">Transferts simultanés</string>
+    <string name="pref_transfers_summary">Nombre de fichiers transférés en parallèle (défaut : 4)</string>
+    <string name="pref_drive_chunk_size_title">Taille des blocs d\'envoi Google Drive</string>
+    <string name="pref_drive_chunk_size_summary">Une taille de bloc plus grande augmente considérablement la vitesse d\'envoi (défaut : 64 Mo)</string>
+    <string name="pref_fast_list_title">Scan rapide des dossiers</string>
+    <string name="pref_fast_list_summary">Utilise moins de requêtes API pour lister les dossiers plus rapidement</string>
+    <string name="transfers_1">1 (Économie batterie)</string>
+    <string name="transfers_2">2</string>
+    <string name="transfers_4">4 (Recommandé)</string>
+    <string name="transfers_8">8 (Ultra rapide)</string>
+    <string name="drive_chunk_size_8m">8 Mo (RAM minimale)</string>
+    <string name="drive_chunk_size_16m">16 Mo</string>
+    <string name="drive_chunk_size_32m">32 Mo</string>
+    <string name="drive_chunk_size_64m">64 Mo (Recommandé - Rapide)</string>
+    <string name="drive_chunk_size_128m">128 Mo (Ultra rapide)</string>
 </resources>
 

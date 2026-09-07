@@ -788,6 +788,53 @@ public class Rclone {
      * @param syncDirection
      * @return
      */
+    public ArrayList<String> getPerformanceParameters(boolean isDirectoryOp) {
+        ArrayList<String> params = new ArrayList<>();
+        String transfers = "4";
+        String driveChunkSize = "64M";
+        boolean fastList = true;
+
+        if (context != null) {
+            SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(context);
+            transfers = pref.getString(context.getString(R.string.pref_key_transfers), "4");
+            if (transfers == null || transfers.trim().isEmpty()) {
+                transfers = "4";
+            }
+            driveChunkSize = pref.getString(context.getString(R.string.pref_key_drive_chunk_size), "64M");
+            if (driveChunkSize == null || driveChunkSize.trim().isEmpty()) {
+                driveChunkSize = "64M";
+            }
+            fastList = pref.getBoolean(context.getString(R.string.pref_key_fast_list), true);
+        }
+
+        params.add("--transfers");
+        params.add(transfers);
+
+        params.add("--drive-chunk-size");
+        params.add(driveChunkSize);
+
+        params.add("--drive-upload-cutoff");
+        params.add("32M");
+
+        params.add("--drive-pacer-min-sleep");
+        params.add("10ms");
+
+        params.add("--drive-pacer-burst");
+        params.add("200");
+
+        params.add("--buffer-size");
+        params.add("16M");
+
+        params.add("--checkers");
+        params.add("8");
+
+        if (isDirectoryOp && fastList) {
+            params.add("--fast-list");
+        }
+
+        return params;
+    }
+
     @Deprecated
     public Process sync(RemoteItem remoteItem, String localPath, String remotePath, int syncDirection) {
         return sync(remoteItem, localPath, remotePath, syncDirection, false, new ArrayList<>(0), false);
@@ -799,7 +846,9 @@ public class Rclone {
         String localRemotePath = (remoteItem.isRemoteType(RemoteItem.LOCAL)) ? getLocalRemotePathPrefix(remoteItem, context)  + "/" : "";
         String remoteSection = (remotePath.compareTo("//" + remoteName) == 0) ? remoteName + ":" + localRemotePath : remoteName + ":" + localRemotePath + remotePath;
 
-        ArrayList<String> defaultParameter = new ArrayList<>(Arrays.asList("--transfers", "1", "--stats=1s", "--stats-log-level", "NOTICE", "--use-json-log"));
+        boolean isBisync = (syncDirection == SyncDirectionObject.SYNC_BIDIRECTIONAL_INITIAL || syncDirection == SyncDirectionObject.SYNC_BIDIRECTIONAL);
+        ArrayList<String> defaultParameter = new ArrayList<>(Arrays.asList("--stats=1s", "--stats-log-level", "NOTICE", "--use-json-log"));
+        defaultParameter.addAll(getPerformanceParameters(!isBisync));
         ArrayList<String> directionParameter = new ArrayList<>();
 
         addAndroidStorageExclusions(defaultParameter, localPath);
@@ -903,7 +952,9 @@ public class Rclone {
 
         localFilePath = encodePath(localFilePath);
 
-        command = createCommandWithOptions("copy", remoteFilePath, localFilePath, "--transfers", "1", "--stats=1s", "--stats-log-level", "NOTICE", "--use-json-log");
+        ArrayList<String> downloadOptions = new ArrayList<>(Arrays.asList("copy", remoteFilePath, localFilePath, "--stats=1s", "--stats-log-level", "NOTICE", "--use-json-log"));
+        downloadOptions.addAll(getPerformanceParameters(downloadItem.isDir()));
+        command = createCommandWithOptions(downloadOptions);
 
         String[] env = getRcloneEnv();
         try {
@@ -935,7 +986,9 @@ public class Rclone {
             path = (uploadPath.compareTo("//" + remoteName) == 0) ? remoteName + ":" + localRemotePath : remoteName + ":" + localRemotePath + uploadPath;
         }
 
-        command = createCommandWithOptions("copy", uploadFile, path, "--transfers", "1", "--stats=1s", "--stats-log-level", "NOTICE", "--use-json-log");
+        ArrayList<String> uploadOptions = new ArrayList<>(Arrays.asList("copy", uploadFile, path, "--stats=1s", "--stats-log-level", "NOTICE", "--use-json-log"));
+        uploadOptions.addAll(getPerformanceParameters(file.isDirectory()));
+        command = createCommandWithOptions(uploadOptions);
 
         String[] env = getRcloneEnv();
         try {

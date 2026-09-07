@@ -52,4 +52,34 @@
         <item>KB</item>
         <item>MB</item>
     </string-array>
+
+    <string-array name="transfers_entries">
+        <item>@string/transfers_1</item>
+        <item>@string/transfers_2</item>
+        <item>@string/transfers_4</item>
+        <item>@string/transfers_8</item>
+    </string-array>
+
+    <string-array name="transfers_values">
+        <item>1</item>
+        <item>2</item>
+        <item>4</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="drive_chunk_size_entries">
+        <item>@string/drive_chunk_size_8m</item>
+        <item>@string/drive_chunk_size_16m</item>
+        <item>@string/drive_chunk_size_32m</item>
+        <item>@string/drive_chunk_size_64m</item>
+        <item>@string/drive_chunk_size_128m</item>
+    </string-array>
+
+    <string-array name="drive_chunk_size_values">
+        <item>8M</item>
+        <item>16M</item>
+        <item>32M</item>
+        <item>64M</item>
+        <item>128M</item>
+    </string-array>
 </resources>
